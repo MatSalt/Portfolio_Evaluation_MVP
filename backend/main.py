@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
 import logging
-# from api.analyze import router as analyze_router  # TODO: 구현 후 활성화
+from api.analyze import router as analyze_router
 
 # 환경변수 로드
 load_dotenv()
@@ -49,7 +49,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # 라우터 등록
-# app.include_router(analyze_router, prefix="/api", tags=["분석"])  # TODO: 구현 후 활성화
+app.include_router(analyze_router, prefix="/api", tags=["분석"])
 
 @app.get("/")
 async def root():
