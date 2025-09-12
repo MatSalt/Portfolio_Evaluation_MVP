@@ -1,0 +1,29 @@
+# FastAPI 및 서버
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+
+# 파일 업로드 처리
+python-multipart==0.0.20
+
+# Gemini API
+google-genai==1.36.0
+
+# 데이터 검증 및 설정
+pydantic==2.11.7
+pydantic-settings==2.10.1
+
+# 환경변수 관리
+python-dotenv==1.1.1
+
+# 이미지 처리
+Pillow==11.3.0
+
+# 테스트
+pytest==8.4.2
+pytest-asyncio==1.2.0
+httpx==0.28.1
+
+# 개발 도구
+black==25.1.0
+isort==6.0.1
+flake8==7.3.0

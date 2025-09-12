@@ -40,7 +40,7 @@
 ## 🔧 백엔드 (Backend)
 
 ### 1. Python
-- **버전**: 3.13.7
+- **버전**: 3.13.2
 - **공식 문서**: https://docs.python.org/3/
 - **설명**: 고급 프로그래밍 언어, FastAPI 백엔드 개발에 사용
 
@@ -51,19 +51,59 @@
 - **설명**: 고성능, 자동 문서화, 타입 힌트를 지원하는 Python 웹 프레임워크
 
 ### 3. Uvicorn
-- **버전**: 0.32.1
+- **버전**: 0.35.0
 - **공식 문서**: https://www.uvicorn.org/
 - **설명**: ASGI 서버, FastAPI 애플리케이션 실행에 사용
 
 ### 4. Pydantic
-- **버전**: 2.10.3
+- **버전**: 2.11.7
 - **공식 문서**: https://docs.pydantic.dev/
 - **설명**: 데이터 검증 및 설정 관리 라이브러리
 
-### 5. Python Multipart
+### 5. Pydantic Settings
+- **버전**: 2.10.1
+- **공식 문서**: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+- **설명**: Pydantic 기반 설정 관리 라이브러리
+
+### 6. Python Multipart
 - **버전**: 0.0.20
 - **공식 문서**: https://github.com/andrew-d/python-multipart
 - **설명**: 파일 업로드 처리를 위한 라이브러리
+
+### 7. Python Dotenv
+- **버전**: 1.1.1
+- **공식 문서**: https://python-dotenv.readthedocs.io/
+- **설명**: 환경변수 관리를 위한 라이브러리
+
+### 8. Pillow
+- **버전**: 11.3.0
+- **공식 문서**: https://pillow.readthedocs.io/
+- **설명**: Python 이미지 처리 라이브러리
+
+### 9. Starlette
+- **버전**: 0.47.3
+- **공식 문서**: https://www.starlette.io/
+- **설명**: FastAPI의 기반이 되는 ASGI 프레임워크
+
+### 10. AnyIO
+- **버전**: 4.10.0
+- **공식 문서**: https://anyio.readthedocs.io/
+- **설명**: 비동기 프로그래밍을 위한 라이브러리
+
+### 11. Google Auth
+- **버전**: 2.40.3
+- **공식 문서**: https://google-auth.readthedocs.io/
+- **설명**: Google API 인증을 위한 라이브러리
+
+### 12. Requests
+- **버전**: 2.32.5
+- **공식 문서**: https://requests.readthedocs.io/
+- **설명**: HTTP 요청을 위한 Python 라이브러리
+
+### 13. Tenacity
+- **버전**: 9.1.2
+- **공식 문서**: https://tenacity.readthedocs.io/
+- **설명**: 재시도 로직을 위한 라이브러리
 
 ---
 
@@ -76,7 +116,7 @@
 - **설명**: Google의 최신 AI 모델, 이미지 분석 및 텍스트 생성에 사용
 
 ### 2. Google Gen AI Python SDK
-- **버전**: 0.8.3
+- **버전**: 1.36.0
 - **공식 문서**: https://googleapis.github.io/python-genai/
 - **GitHub 저장소**: https://github.com/googleapis/python-genai
 - **설명**: Gemini API를 Python에서 사용하기 위한 공식 SDK
@@ -96,17 +136,17 @@
 - **설명**: 코드 포맷팅 도구
 
 ### 3. Black (Python)
-- **버전**: 24.10.0
+- **버전**: 25.1.0
 - **공식 문서**: https://black.readthedocs.io/
 - **설명**: Python 코드 포맷팅 도구
 
 ### 4. isort (Python)
-- **버전**: 5.13.2
+- **버전**: 6.0.1
 - **공식 문서**: https://pycqa.github.io/isort/
 - **설명**: Python import 문 정렬 도구
 
 ### 5. flake8 (Python)
-- **버전**: 7.1.1
+- **버전**: 7.3.0
 - **공식 문서**: https://flake8.pycqa.org/
 - **설명**: Python 코드 스타일 검사 도구
 
@@ -125,17 +165,17 @@
 - **설명**: React 컴포넌트 테스트 라이브러리
 
 ### 3. pytest (Python)
-- **버전**: 8.3.4
+- **버전**: 8.4.2
 - **공식 문서**: https://docs.pytest.org/
 - **설명**: Python 테스트 프레임워크
 
 ### 4. pytest-asyncio
-- **버전**: 0.25.0
+- **버전**: 1.2.0
 - **공식 문서**: https://pytest-asyncio.readthedocs.io/
 - **설명**: pytest에서 비동기 테스트를 위한 플러그인
 
 ### 5. httpx
-- **버전**: 0.27.2
+- **버전**: 0.28.1
 - **공식 문서**: https://www.python-httpx.org/
 - **설명**: HTTP 클라이언트 라이브러리, 테스트에 사용
 
@@ -204,5 +244,5 @@
 ---
 
 **문서 작성일**: 2025년 9월 12일  
-**최종 업데이트**: 2025년 9월 12일  
+**최종 업데이트**: 2025년 9월 12일 (requirements.txt 버전 동기화)  
 **작성자**: AI Assistant
