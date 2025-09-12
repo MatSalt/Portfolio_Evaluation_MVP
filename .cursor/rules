@@ -1,0 +1,128 @@
+# Portfolio Evaluation MVP - Cursor Rules
+
+## 프로젝트 개요
+이 프로젝트는 AI Vision 모델을 사용하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
+
+## 기술 스택
+- **프론트엔드**: Next.js 15.3 (TypeScript)
+- **백엔드**: Python 3.12, FastAPI 0.110.0
+- **AI 모델**: Google Gemini 2.5 Flash API
+- **마크다운 렌더링**: react-markdown, remark-gfm
+- **배포**: Vercel (Frontend), Render (Backend)
+
+## 기술 스택 최신화 정책
+1. **정기 업데이트**: 매월 첫째 주에 모든 기술 스택의 최신 버전을 확인합니다.
+2. **검색 기준**: 기술 스택 검색 시 항상 당일(2025년 9월 12일) 기준으로 최신 버전을 확인합니다.
+3. **신뢰할 수 있는 정보원**: 
+   - Next.js: https://nextjs.org/
+   - FastAPI: https://fastapi.tiangolo.com/
+   - Python: https://www.python.org/
+   - Google AI: https://ai.google.dev/
+4. **업데이트 절차**:
+   - 당일 기준 최신 버전 확인 후 호환성 검토
+   - 개발 환경에서 테스트 후 적용
+   - 변경사항 문서화 및 팀 공유
+5. **버전 고정**: package.json과 requirements.txt에 정확한 버전 명시
+
+## 코딩 규칙
+
+### 일반 규칙
+1. 모든 코드는 한국어 주석을 사용합니다.
+2. 변수명과 함수명은 영어를 사용하되, 주석은 한국어로 작성합니다.
+3. TypeScript를 사용할 때는 엄격한 타입 체크를 적용합니다.
+4. Python 코드는 PEP 8 스타일 가이드를 따릅니다.
+
+### 프론트엔드 (Next.js)
+1. 컴포넌트는 함수형 컴포넌트와 React Hooks를 사용합니다.
+2. 상태 관리는 useState와 useEffect를 우선 사용합니다.
+3. API 호출은 fetch API를 사용하며, async/await 패턴을 적용합니다.
+4. 에러 처리는 try-catch 블록을 사용합니다.
+5. 파일 구조:
+   - `src/app/page.tsx`: 메인 페이지
+   - `src/components/ImageUploader.tsx`: 이미지 업로드 컴포넌트
+   - `src/components/AnalysisDisplay.tsx`: 분석 결과 표시 컴포넌트
+
+### 백엔드 (FastAPI)
+1. 모든 API 엔드포인트는 비동기 함수로 작성합니다.
+2. 요청/응답 모델은 Pydantic을 사용하여 정의합니다.
+3. 에러 처리는 HTTPException을 사용합니다.
+4. 파일 구조:
+   - `main.py`: FastAPI 앱 진입점
+   - `api/analyze.py`: 포트폴리오 분석 API
+   - `models/`: Pydantic 모델 정의
+   - `services/`: 비즈니스 로직
+
+### Gemini API 연동
+1. Google AI Studio API 키를 환경변수로 관리합니다.
+2. `google-generativeai` 라이브러리를 사용합니다.
+3. 이미지는 Base64로 인코딩하여 전송합니다.
+4. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 다음을 생성하도록 합니다:
+   - AI 총평 (2-3문장)
+   - 종합 리니아 스코어 (0-100)
+   - 3대 핵심 기준 스코어 (성장 잠재력, 안정성 및 방어력, 전략적 일관성)
+   - 상세 분석 (각 기준별 3-4문장)
+   - 강점/약점/기회 분석 (실행 가능한 인사이트 및 What-if 시나리오 포함)
+   - 개별 종목별 5가지 평가 기준 점수 및 상세 분석
+5. API 호출 시 상세하고 높은 품질의 응답을 얻도록 최적화합니다.
+
+### API 설계
+1. 이미지 업로드: `POST /api/analyze`
+2. 요청 형식: `multipart/form-data`
+3. 응답 형식: JSON (포트폴리오 데이터 배열)
+
+### 데이터 형식
+```json
+{
+  "aiSummary": "AI 총평 (2-3문장)",
+  "overallScore": 72,
+  "dimensionScores": {
+    "growthPotential": 88,
+    "stabilityDefense": 55,
+    "strategicConsistency": 74
+  },
+  "detailedAnalysis": {
+    "growthAnalysis": "성장 잠재력 상세 분석",
+    "stabilityAnalysis": "안정성 및 방어력 상세 분석",
+    "consistencyAnalysis": "전략적 일관성 상세 분석"
+  },
+  "strengths": ["강점 1", "강점 2"],
+  "weaknesses": ["약점 1", "약점 2"],
+  "opportunities": ["기회 1 (What-if 시나리오 포함)", "기회 2"],
+  "stocks": [
+    {
+      "stockName": "종목명",
+      "overallScore": 78,
+      "fundamentalScore": 70,
+      "techPotentialScore": 95,
+      "macroScore": 75,
+      "marketSentimentScore": 85,
+      "leadershipScore": 85,
+      "detailedAnalysis": "종목별 상세 분석"
+    }
+  ]
+}
+```
+
+### 에러 처리
+- 400: 잘못된 요청 (이미지 파일이 아님)
+- 500: 내부 서버 오류 (Gemini 응답 파싱 실패)
+- 503: 서비스 불가 (Gemini API 호출 실패)
+
+## 개발 우선순위
+1. 이미지 업로드 기능
+2. Gemini Vision API 연동
+3. 결과 테이블 표시
+4. 데이터 수정 기능
+5. 에러 처리 및 사용자 피드백
+
+## 테스트
+- 프론트엔드: Jest + React Testing Library
+- 백엔드: pytest
+- API 테스트: 실제 이미지 파일로 테스트
+
+## 보안 고려사항
+1. 업로드된 이미지는 처리 후 즉시 삭제
+2. Gemini API 키는 환경변수로 관리
+3. 파일 크기 제한 (예: 10MB)
+4. 허용된 이미지 형식만 업로드 가능 (PNG, JPEG)
+5. API 호출 빈도 제한 (Rate Limiting)
