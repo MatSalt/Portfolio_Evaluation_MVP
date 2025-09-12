@@ -1,7 +1,7 @@
 # Portfolio Evaluation MVP - Cursor Rules
 
 ## 프로젝트 개요
-이 프로젝트는 AI Vision 모델을 사용하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
+이 프로젝트는 AI Vision 모델을 사용하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, expected_result.md와 동일한 형식의 마크다운 텍스트로 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
 
 ## 기술 스택
 - **프론트엔드**: Next.js 15.5.3 (TypeScript)
@@ -67,69 +67,44 @@
    - 공식 문서: https://googleapis.github.io/python-genai/
    - **Gemini LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
 4. 이미지는 Base64로 인코딩하여 전송합니다.
-5. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 다음을 생성하도록 합니다:
+5. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 expected_result.md와 동일한 마크다운 형식으로 다음을 생성하도록 합니다:
    - AI 총평 (2-3문장)
    - 종합 리니아 스코어 (0-100)
    - 3대 핵심 기준 스코어 (성장 잠재력, 안정성 및 방어력, 전략적 일관성)
    - 상세 분석 (각 기준별 3-4문장)
    - 강점/약점/기회 분석 (실행 가능한 인사이트 및 What-if 시나리오 포함)
    - 개별 종목별 5가지 평가 기준 점수 및 상세 분석
-5. API 호출 시 상세하고 높은 품질의 응답을 얻도록 최적화합니다.
+6. API 호출 시 상세하고 높은 품질의 마크다운 텍스트 응답을 얻도록 최적화합니다.
 
 ### API 설계
 1. 이미지 업로드: `POST /api/analyze`
 2. 요청 형식: `multipart/form-data`
-3. 응답 형식: JSON (포트폴리오 데이터 배열)
+3. 응답 형식: JSON (마크다운 텍스트 포함)
 
 ### 데이터 형식
 ```json
 {
-  "aiSummary": "AI 총평 (2-3문장)",
-  "overallScore": 72,
-  "dimensionScores": {
-    "growthPotential": 88,
-    "stabilityDefense": 55,
-    "strategicConsistency": 74
-  },
-  "detailedAnalysis": {
-    "growthAnalysis": "성장 잠재력 상세 분석",
-    "stabilityAnalysis": "안정성 및 방어력 상세 분석",
-    "consistencyAnalysis": "전략적 일관성 상세 분석"
-  },
-  "strengths": ["강점 1", "강점 2"],
-  "weaknesses": ["약점 1", "약점 2"],
-  "opportunities": ["기회 1 (What-if 시나리오 포함)", "기회 2"],
-  "stocks": [
-    {
-      "stockName": "종목명",
-      "overallScore": 78,
-      "fundamentalScore": 70,
-      "techPotentialScore": 95,
-      "macroScore": 75,
-      "marketSentimentScore": 85,
-      "leadershipScore": 85,
-      "detailedAnalysis": "종목별 상세 분석"
-    }
-  ]
+  "content": "**AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]\n\n**포트폴리오 종합 리니아 스코어: [0-100] / 100**\n\n**3대 핵심 기준 스코어:**\n\n- **성장 잠재력:** [0-100] / 100\n- **안정성 및 방어력:** [0-100] / 100\n- **전략적 일관성:** [0-100] / 100\n\n... (expected_result.md와 동일한 마크다운 형식의 전체 분석 결과)",
+  "processing_time": 15.2,
+  "request_id": "uuid-string"
 }
 ```
 
 ### 에러 처리
 - 400: 잘못된 요청 (이미지 파일이 아님)
-- 500: 내부 서버 오류 (Gemini 응답 파싱 실패)
+- 500: 내부 서버 오류 (Gemini 응답 형식 오류)
 - 503: 서비스 불가 (Gemini API 호출 실패)
 
 ## 개발 우선순위
 1. 이미지 업로드 기능
 2. Gemini Vision API 연동
-3. 결과 테이블 표시
-4. 데이터 수정 기능
-5. 에러 처리 및 사용자 피드백
+3. 마크다운 텍스트 렌더링
+4. 에러 처리 및 사용자 피드백
 
 ## 테스트
 - 프론트엔드: Jest + React Testing Library
 - 백엔드: pytest
-- API 테스트: 실제 이미지 파일로 테스트
+- API 테스트: 실제 이미지 파일로 마크다운 출력 품질 테스트
 
 ## 보안 고려사항
 1. 업로드된 이미지는 처리 후 즉시 삭제

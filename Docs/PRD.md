@@ -15,7 +15,7 @@
 1.  **[진입]** 메인 페이지 진입 → 업로드 영역 표시.
 2.  **[업로드]** 스크린샷 업로드(버튼/드래그 앤 드롭).
 3.  **[처리]** 프론트엔드가 이미지를 백엔드 `/api/analyze`로 전송, 로딩 인디케이터 표시.
-4.  **[AI 분석 출력]** 백엔드 분석 완료 후, **AI 총평/종합 스코어/3대 기준 스코어/종목별 분석 카드**를 **마크다운 형식**으로 화면에 표시.
+4.  **[AI 분석 출력]** 백엔드 분석 완료 후, **AI 총평/종합 스코어/3대 기준 스코어/종목별 분석 카드**를 **마크다운 텍스트**로 화면에 표시.
 
 ### \#\# 2. 핵심 기능 명세 (Core Feature Specifications)
 
@@ -68,20 +68,19 @@
             2.  이미지 파일을 메모리에서 읽어 **Base64**로 인코딩한다.
             3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지를 포함하여 요청을 구성한다.
             4.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
-            5.  LLM이 반환한 JSON 형식의 텍스트 응답을 파싱(Parsing)한다.
-            6.  파싱된 데이터가 \*\*요구되는 데이터 형식(아래 3.2. 참조)\*\*을 따르는지 검증한다.
-            7.  성공 시, 상태 코드 `200 OK`와 함께 추출된 JSON 데이터를 반환한다.
+            5.  LLM이 반환한 **마크다운 형식의 텍스트 응답**을 그대로 받는다.
+            6.  성공 시, 상태 코드 `200 OK`와 함께 **마크다운 텍스트**를 반환한다.
           * **에러 핸들링 (Error Handling):**
               * 이미지 파일이 아닐 경우: `400 Bad Request`
               * LLM API 호출 실패 시: `503 Service Unavailable`
-              * LLM 응답 파싱/검증 실패 시: `500 Internal Server Error`
+              * LLM 응답 형식 오류 시: `500 Internal Server Error`
           * **응답 (Response):** 아래 **3. 데이터 요구사항** 참조
 
 ### \#\# 3. 데이터 요구사항 (Data & API Specification)
 
 #### **3.1. Gemini API 통합 및 프롬프트 (Gemini API Integration & Prompt)**
 
-백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, 요구 JSON 스키마에 맞춘 **분석 결과**를 생성하도록 지시합니다.
+백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, **expected_result.md와 동일한 마크다운 형식의 분석 결과**를 생성하도록 지시합니다.
 
 **Google Gen AI Python SDK 사용법:**
 ```python
@@ -100,45 +99,77 @@ response = client.models.generate_content(
 **참고 자료**: Gemini API 상세 정보는 `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt` 파일을 참고하세요.
 
 ```text
-You are an expert portfolio analyst specializing in comprehensive investment analysis. From the provided brokerage screenshot(s), extract holdings and produce a detailed analysis following the exact format below.
+당신은 포트폴리오 분석 전문가입니다. 제공된 증권사 앱 스크린샷에서 보유 종목을 추출하고 종합적인 투자 분석을 수행하세요.
 
-Output strictly the following JSON object (no extra text):
-{
-  "aiSummary": string,
-  "overallScore": integer,
-  "dimensionScores": {
-    "growthPotential": integer,
-    "stabilityDefense": integer,
-    "strategicConsistency": integer
-  },
-  "detailedAnalysis": {
-    "growthAnalysis": string,
-    "stabilityAnalysis": string,
-    "consistencyAnalysis": string
-  },
-  "strengths": Array<string>,
-  "weaknesses": Array<string>,
-  "opportunities": Array<string>,
-  "stocks": Array<{
-    "stockName": string,
-    "overallScore": integer,
-    "fundamentalScore": integer,
-    "techPotentialScore": integer,
-    "macroScore": integer,
-    "marketSentimentScore": integer,
-    "leadershipScore": integer,
-    "detailedAnalysis": string
-  }>
-}
+다음 마크다운 형식으로 정확히 출력하세요 (추가 텍스트 없이):
 
-Rules:
-- aiSummary: 2-3 sentences describing portfolio strategy and main risks
-- detailedAnalysis: Each section should be 3-4 sentences with specific insights
-- strengths/weaknesses/opportunities: Each item should be 1-2 sentences with actionable insights. Include a simple "What-if" scenario within the opportunities.
-- stocks: Include comprehensive 5-criteria scoring (0-100) and detailed analysis per stock
-- All text must be Korean
-- Use professional investment analysis language
-- Include specific examples and data points when possible
+**AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]
+
+**포트폴리오 종합 리니아 스코어: [0-100] / 100**
+
+**3대 핵심 기준 스코어:**
+
+- **성장 잠재력:** [0-100] / 100
+- **안정성 및 방어력:** [0-100] / 100
+- **전략적 일관성:** [0-100] / 100
+
+**[1] 포트폴리오 리니아 스코어 심층 분석**
+
+**1.1 성장 잠재력 분석 ([점수] / 100): [제목]**
+
+[3-4문장의 구체적 분석]
+
+**1.2 안정성 및 방어력 분석 ([점수] / 100): [제목]**
+
+[3-4문장의 구체적 분석]
+
+**1.3 전략적 일관성 분석 ([점수] / 100): [제목]**
+
+[3-4문장의 구체적 분석]
+
+**[2] 포트폴리오 강점 및 약점, 그리고 기회**
+
+**💪 강점**
+
+- [강점 1: 1-2문장, 실행 가능한 인사이트]
+- [강점 2: 1-2문장, 실행 가능한 인사이트]
+
+**📉 약점**
+
+- [약점 1: 1-2문장, 구체적 개선방안]
+- [약점 2: 1-2문장, 구체적 개선방안]
+
+**💡 기회 및 개선 방안**
+
+- [기회 1: What-if 시나리오 포함]
+- [기회 2: 구체적 실행 방안]
+
+**[3] 개별 종목 리니아 스코어 상세 분석**
+
+**3.1 스코어 요약 테이블**
+
+| 주식 | Overall (100점 만점) | 펀더멘탈 | 기술 잠재력 | 거시경제 | 시장심리 | CEO/리더십 |
+| --- | --- | --- | --- | --- | --- | --- |
+| [종목명] | [점수] | [점수] | [점수] | [점수] | [점수] | [점수] |
+
+**3.2 개별 종목 분석 카드**
+
+**[번호]. [종목명] - Overall: [점수] / 100**
+
+- **펀더멘탈 ([점수]/100):** [상세 분석]
+- **기술 잠재력 ([점수]/100):** [상세 분석]
+- **거시경제 ([점수]/100):** [상세 분석]
+- **시장심리 ([점수]/100):** [상세 분석]
+- **CEO/리더십 ([점수]/100):** [상세 분석]
+
+분석 규칙:
+- 모든 점수는 0-100 사이의 정수로 평가
+- 각 분석은 구체적이고 전문적인 내용으로 작성
+- 강점/약점/기회는 실행 가능한 인사이트 제공
+- 기회에는 간단한 "What-if" 시나리오 포함
+- 모든 텍스트는 한국어로 작성
+- 전문적인 투자 분석 언어 사용
+- 구체적인 예시와 데이터 포인트 포함
 ```
 
 #### **3.2. API 응답 형식 (API Response Schema)**
@@ -147,42 +178,9 @@ Rules:
 
     ```json
     {
-      "aiSummary": "문영님의 포트폴리오는 '양자 컴퓨팅 및 AI 기술 혁신 추구형' 전략을 명확히 따르고 있으며, 잠재력은 높으나 기술주의 높은 변동성과 신흥 기술 리스크에 다소 취약합니다.",
-      "overallScore": 72,
-      "dimensionScores": {
-        "growthPotential": 88,
-        "stabilityDefense": 55,
-        "strategicConsistency": 74
-      },
-      "detailedAnalysis": {
-        "growthAnalysis": "문영님의 포트폴리오는 '기술 잠재력' 및 'CEO/리더십' 인덱스 점수가 매우 높은 종목들에 집중적으로 투자되어 있어 압도적인 성장 잠재력을 보여줍니다. 특히, 팔란티어(PLTR), 디파이언스 양자컴퓨터 ETF(QQC), 아이온큐(IONQ) 등 양자 컴퓨팅, AI, 데이터 인프라 등 미래 핵심 기술 분야의 선두 주자들에 대한 투자 비중이 전체의 상당 부분을 차지하고 있습니다.",
-        "stabilityAnalysis": "포트폴리오의 안정성 및 방어력 점수는 55점으로 상대적으로 낮은 수준입니다. 이는 대부분의 종목들이 아직 상업적 성공을 확정 짓지 못한 성장 단계의 기술 기업들이거나, 높은 변동성을 특징으로 하는 ETF로 구성되어 있기 때문입니다.",
-        "consistencyAnalysis": "문영님의 포트폴리오는 '양자 컴퓨팅'과 'AI'라는 명확한 투자 테마를 중심으로 구성되어 있어 높은 전략적 일관성을 가집니다. 하지만, 동시에 특정 기술 섹터에 대한 과도한 집중은 또 다른 형태의 리스크로 작용할 수 있습니다."
-      },
-      "strengths": [
-        "선구적인 미래 기술 투자: 양자 컴퓨팅, AI, 바이오 신약 등 미래 성장 동력에 대한 과감하고 선구적인 투자를 통해 시장의 흐름을 앞서 나갈 잠재력을 보유하고 있습니다.",
-        "명확하고 일관된 투자 테마: '기술 혁신'이라는 뚜렷한 투자 철학이 포트폴리오 전반에 걸쳐 일관되게 적용되어, 문영님의 신념이 반영된 투자를 하고 있습니다."
-      ],
-      "weaknesses": [
-        "극심한 변동성 노출: 대부분의 종목이 성장주 및 신흥 기술주에 속하여 시장의 작은 움직임에도 포트폴리오 가치가 크게 요동칠 수 있습니다.",
-        "기술 섹터 집중 리스크: 양자 컴퓨팅 및 AI라는 특정 기술 분야에 대한 의존도가 높아, 해당 분야에 예상치 못한 악재 발생 시 포트폴리오 전체가 심각한 타격을 입을 수 있습니다."
-      ],
-      "opportunities": [
-        "안정적인 '핵심' 자산 추가: TIGER 미국S&P500 ETF의 비중을 높이거나, 마이크로소프트(MSFT)나 엔비디아(NVDA)와 같이 AI 시대의 필수 인프라를 제공하며 동시에 안정적인 재무구조를 가진 초대형 기술주를 편입하여 '안정성 및 방어력' 점수를 높이는 것을 고려할 수 있습니다.",
-        "유사 테마 내 분산 투자: 양자 컴퓨팅 및 AI 테마는 유지하되, 관련 산업 내에서도 서로 다른 세부 기술 분야나 지역(글로벌 다변화)에 분산 투자하여 리스크를 줄일 수 있습니다."
-      ],
-      "stocks": [
-        {
-          "stockName": "팔란티어 테크놀로지스 (PLTR)",
-          "overallScore": 78,
-          "fundamentalScore": 70,
-          "techPotentialScore": 95,
-          "macroScore": 75,
-          "marketSentimentScore": 85,
-          "leadershipScore": 85,
-          "detailedAnalysis": "꾸준한 매출 성장과 최근 GAAP 기준 흑자 전환 성공은 긍정적이나, 여전히 높은 밸류에이션 부담이 존재합니다. 빅데이터 분석 및 AI 분야 독보적인 기술력으로 고담(정부) 및 AIP(상업) 플랫폼 모두에서 빠른 성장을 보입니다."
-        }
-      ]
+      "content": "**AI 총평:** 문영님의 포트폴리오는 '양자 컴퓨팅 및 AI 기술 혁신 추구형' 전략을 명확히 따르고 있으며, 잠재력은 높으나 기술주의 높은 변동성과 신흥 기술 리스크에 다소 취약합니다.\n\n**포트폴리오 종합 리니아 스코어: 72 / 100**\n\n**3대 핵심 기준 스코어:**\n\n- **성장 잠재력:** 88 / 100\n- **안정성 및 방어력:** 55 / 100\n- **전략적 일관성:** 74 / 100\n\n... (expected_result.md와 동일한 마크다운 형식의 전체 분석 결과)",
+      "processing_time": 15.2,
+      "request_id": "uuid-string"
     }
     ```
 
@@ -190,7 +188,9 @@ Rules:
 
     ```json
     {
-      "error": "An informative error message."
+      "error": "분석 중 오류가 발생했습니다.",
+      "detail": "구체적인 오류 내용",
+      "code": "400"
     }
     ```
 
@@ -234,13 +234,13 @@ Rules:
 
   * Google Gen AI Python SDK를 통한 Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
   * 동일 이미지 반복 분석에 대한 캐싱 전략(해시 기반 중복 방지)을 적용한다.
-  * 비동기 I/O로 업로드/LLM 호출/파싱 파이프라인을 병렬화한다.
+  * 비동기 I/O로 업로드/LLM 호출 파이프라인을 병렬화한다.
 
 -----
 
 ### ## 8. 테스트 및 배포 (Testing & CI/CD)
 
-  * 단위 테스트: 파싱/스키마 검증 로직, 프롬프트 유효성 테스트.
+  * 단위 테스트: 이미지 처리 로직, 프롬프트 유효성 테스트.
   * 통합 테스트: 실제 샘플 스크린샷으로 엔드투엔드 검증.
   * 사용자 수용 테스트(UAT): 다양한 브로커리지 UI 스킨에 대한 견고성 확인.
   * CI/CD: 메인 병합 시 자동 빌드/배포(프론트: Vercel, 백엔드: Render), 시크릿 관리.
