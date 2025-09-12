@@ -4,9 +4,9 @@
 이 프로젝트는 AI Vision 모델을 사용하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
 
 ## 기술 스택
-- **프론트엔드**: Next.js 15.3 (TypeScript)
-- **백엔드**: Python 3.12, FastAPI 0.110.0
-- **AI 모델**: Google Gemini 2.5 Flash API
+- **프론트엔드**: Next.js 15.5.3 (TypeScript)
+- **백엔드**: Python 3.13.7, FastAPI 0.116.1
+- **AI 모델**: Google Gemini 2.5 Flash API (google-genai Python SDK)
 - **마크다운 렌더링**: react-markdown, remark-gfm
 - **배포**: Vercel (Frontend), Render (Backend)
 
@@ -33,20 +33,27 @@
 4. Python 코드는 PEP 8 스타일 가이드를 따릅니다.
 
 ### 프론트엔드 (Next.js)
-1. 컴포넌트는 함수형 컴포넌트와 React Hooks를 사용합니다.
-2. 상태 관리는 useState와 useEffect를 우선 사용합니다.
-3. API 호출은 fetch API를 사용하며, async/await 패턴을 적용합니다.
-4. 에러 처리는 try-catch 블록을 사용합니다.
-5. 파일 구조:
+1. **Next.js 관련 코드 작성 시 항상 공식 문서 참고 필수**:
+   - 공식 문서: https://nextjs.org/docs
+   - GitHub 저장소: https://github.com/vercel/next.js
+   - **Next.js LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt`
+2. 컴포넌트는 함수형 컴포넌트와 React Hooks를 사용합니다.
+3. 상태 관리는 useState와 useEffect를 우선 사용합니다.
+4. API 호출은 fetch API를 사용하며, async/await 패턴을 적용합니다.
+5. 에러 처리는 try-catch 블록을 사용합니다.
+6. 파일 구조:
    - `src/app/page.tsx`: 메인 페이지
    - `src/components/ImageUploader.tsx`: 이미지 업로드 컴포넌트
    - `src/components/AnalysisDisplay.tsx`: 분석 결과 표시 컴포넌트
 
 ### 백엔드 (FastAPI)
-1. 모든 API 엔드포인트는 비동기 함수로 작성합니다.
-2. 요청/응답 모델은 Pydantic을 사용하여 정의합니다.
-3. 에러 처리는 HTTPException을 사용합니다.
-4. 파일 구조:
+1. **FastAPI 관련 코드 작성 시 항상 공식 문서 참고 필수**:
+   - 공식 문서: https://fastapi.tiangolo.com/reference/
+   - GitHub 저장소: https://github.com/fastapi/fastapi
+2. 모든 API 엔드포인트는 비동기 함수로 작성합니다.
+3. 요청/응답 모델은 Pydantic을 사용하여 정의합니다.
+4. 에러 처리는 HTTPException을 사용합니다.
+5. 파일 구조:
    - `main.py`: FastAPI 앱 진입점
    - `api/analyze.py`: 포트폴리오 분석 API
    - `models/`: Pydantic 모델 정의
@@ -54,9 +61,13 @@
 
 ### Gemini API 연동
 1. Google AI Studio API 키를 환경변수로 관리합니다.
-2. `google-generativeai` 라이브러리를 사용합니다.
-3. 이미지는 Base64로 인코딩하여 전송합니다.
-4. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 다음을 생성하도록 합니다:
+2. `google-genai` Python SDK를 사용합니다.
+3. **Gemini 관련 코드 작성 시 항상 공식 문서 참고 필수**:
+   - GitHub: https://github.com/googleapis/python-genai
+   - 공식 문서: https://googleapis.github.io/python-genai/
+   - **Gemini LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
+4. 이미지는 Base64로 인코딩하여 전송합니다.
+5. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 다음을 생성하도록 합니다:
    - AI 총평 (2-3문장)
    - 종합 리니아 스코어 (0-100)
    - 3대 핵심 기준 스코어 (성장 잠재력, 안정성 및 방어력, 전략적 일관성)
@@ -126,3 +137,9 @@
 3. 파일 크기 제한 (예: 10MB)
 4. 허용된 이미지 형식만 업로드 가능 (PNG, JPEG)
 5. API 호출 빈도 제한 (Rate Limiting)
+
+## Git 커밋 규칙
+1. **사용자 명시적 요청 시에만 커밋 수행**: 사용자가 "커밋해줘", "commit", "git commit" 등으로 명시적으로 요청할 때만 커밋을 실행합니다.
+2. **자동 커밋 금지**: 파일 수정 후 자동으로 커밋하지 않습니다.
+3. **커밋 전 확인**: 커밋 전에 변경사항을 사용자에게 알리고 승인을 받습니다.
+4. **의미 있는 커밋 메시지**: Conventional Commits 형식을 사용하여 명확한 커밋 메시지를 작성합니다.

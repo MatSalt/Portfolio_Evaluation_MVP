@@ -5,7 +5,7 @@
 
 ## 핵심 기능
 1. **이미지 업로드**: 드래그 앤 드롭 또는 파일 선택으로 포트폴리오 스크린샷 업로드
-2. **AI 분석**: Google Gemini 2.5 Flash API를 사용한 종합적인 포트폴리오 분석
+2. **AI 분석**: Google Gemini 2.5 Flash API (google-genai Python SDK)를 사용한 종합적인 포트폴리오 분석
 3. **전문 분석 리포트**: AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목 상세 분석
 4. **마크다운 표시**: 분석 결과를 마크다운 형식으로 화면에 렌더링
 5. **에러 처리**: 사용자 친화적인 에러 메시지 표시
@@ -13,6 +13,10 @@
 ## 개발 시 주의사항
 
 ### 프론트엔드 개발
+- **Next.js 관련 코드 작성 시 항상 공식 문서 참고 필수**:
+  - 공식 문서: https://nextjs.org/docs
+  - GitHub 저장소: https://github.com/vercel/next.js
+  - **Next.js LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt`
 - Next.js App Router 사용
 - TypeScript 엄격 모드 적용
 - 컴포넌트는 재사용 가능하도록 설계
@@ -20,6 +24,9 @@
 - 반응형 디자인 적용 (모바일 우선)
 
 ### 백엔드 개발
+- **FastAPI 관련 코드 작성 시 항상 공식 문서 참고 필수**:
+  - 공식 문서: https://fastapi.tiangolo.com/reference/
+  - GitHub 저장소: https://github.com/fastapi/fastapi
 - FastAPI의 비동기 처리 활용
 - Pydantic을 사용한 데이터 검증
 - 환경변수로 API 키 관리
@@ -28,7 +35,8 @@
 
 ### Gemini API 연동
 - Google AI Studio에서 API 키 발급
-- `google-generativeai` 라이브러리 최신 버전 사용
+- `google-genai` Python SDK 최신 버전 사용
+- **Gemini LLMS 상세 정보 참고**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
 - Gemini 2.5 Flash 모델의 Vision 기능 활용
 - 이미지 전처리 (크기 조정, 압축 등)
 - 포트폴리오 분석 전문가 역할의 프롬프트 설계:
@@ -42,9 +50,9 @@
 - 응답 파싱 및 검증 로직
 
 ### 기술 스택 버전 관리
-- **Next.js 15.3**: 최신 App Router 및 성능 최적화 기능 활용
-- **FastAPI 0.110.0**: 최신 비동기 처리 및 보안 패치 적용
-- **Python 3.12**: 최신 언어 기능 및 성능 개선사항 활용
+- **Next.js 15.5.3**: 최신 App Router 및 성능 최적화 기능 활용
+- **FastAPI 0.116.1**: 최신 비동기 처리 및 보안 패치 적용
+- **Python 3.13.7**: 최신 언어 기능 및 성능 개선사항 활용
 - **정기 업데이트**: 매월 첫째 주 기술 스택 최신 버전 확인 및 적용
 - **검색 기준**: 기술 스택 검색 시 항상 당일(2025년 9월 12일) 기준으로 최신 버전 확인
 
@@ -99,19 +107,16 @@
 
 ## Gemini API 사용법
 ```python
-import google.generativeai as genai
+from google import genai
 
 # API 키 설정
-genai.configure(api_key="YOUR_API_KEY")
+client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
 
-# 모델 초기화
-model = genai.GenerativeModel('gemini-2.5-flash')
-
-# 이미지와 프롬프트로 요청
-response = model.generate_content([
-    "포트폴리오 데이터를 추출해주세요...",
-    image_data
-])
+# 이미지와 프롬프트로 포트폴리오 분석 요청
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=[prompt_text, image_data]
+)
 ```
 
 ## 테스트 전략
@@ -154,3 +159,11 @@ response = model.generate_content([
 - 사용자 인증 시스템 확장 가능성
 - 다국어 지원 준비
 - 다른 AI 모델로의 전환 가능성
+
+## 참고 자료
+- **Next.js LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt`
+  - Next.js의 언어 모델 서비스(LLMS)에 대한 상세한 정보가 포함되어 있습니다.
+  - Next.js 관련 개발 시 필요에 따라 이 파일을 참고하세요.
+- **Gemini LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
+  - Gemini API에 대한 상세한 정보가 포함되어 있습니다.
+  - Gemini API 관련 개발 시 필요에 따라 이 파일을 참고하세요.

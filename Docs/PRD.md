@@ -21,6 +21,11 @@
 
 #### **2.1. 프론트엔드 (Frontend - Next.js)**
 
+  * **개발 가이드라인:** Next.js 관련 코드 작성 시 항상 공식 문서 참고 필수
+      * 공식 문서: https://nextjs.org/docs
+      * GitHub 저장소: https://github.com/vercel/next.js
+      * **Next.js LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt`
+
   * **페이지 구성:** 단일 페이지 애플리케이션 (SPA)
 
       * `src/app/page.tsx`: 메인 페이지 컴포넌트
@@ -49,6 +54,10 @@
 
 #### **2.2. 백엔드 (Backend - Python/FastAPI)**
 
+  * **개발 가이드라인:** FastAPI 관련 코드 작성 시 항상 공식 문서 참고 필수
+      * 공식 문서: https://fastapi.tiangolo.com/reference/
+      * GitHub 저장소: https://github.com/fastapi/fastapi
+
   * **엔드포인트 명세:**
       * **`POST /api/analyze`**
           * **요청 (Request):**
@@ -57,7 +66,7 @@
           * **처리 로직 (Processing Logic):**
             1.  요청으로부터 이미지 파일(`UploadFile`)을 받는다.
             2.  이미지 파일을 메모리에서 읽어 **Base64**로 인코딩한다.
-            3.  Vision LLM API(Google Gemini 2.5 Flash)에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지를 포함하여 요청을 구성한다.
+            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지를 포함하여 요청을 구성한다.
             4.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
             5.  LLM이 반환한 JSON 형식의 텍스트 응답을 파싱(Parsing)한다.
             6.  파싱된 데이터가 \*\*요구되는 데이터 형식(아래 3.2. 참조)\*\*을 따르는지 검증한다.
@@ -70,9 +79,25 @@
 
 ### \#\# 3. 데이터 요구사항 (Data & API Specification)
 
-#### **3.1. Vision LLM 프롬프트 (Prompt for Vision LLM)**
+#### **3.1. Gemini API 통합 및 프롬프트 (Gemini API Integration & Prompt)**
 
-백엔드가 LLM을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, 요구 JSON 스키마에 맞춘 **분석 결과**를 생성하도록 지시합니다.
+백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, 요구 JSON 스키마에 맞춘 **분석 결과**를 생성하도록 지시합니다.
+
+**Google Gen AI Python SDK 사용법:**
+```python
+from google import genai
+
+# API 키 설정
+client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
+
+# 이미지와 프롬프트로 포트폴리오 분석 요청
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=[prompt_text, image_data]
+)
+```
+
+**참고 자료**: Gemini API 상세 정보는 `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt` 파일을 참고하세요.
 
 ```text
 You are an expert portfolio analyst specializing in comprehensive investment analysis. From the provided brokerage screenshot(s), extract holdings and produce a detailed analysis following the exact format below.
@@ -173,10 +198,13 @@ Rules:
 
 ### \#\# 4. 기술 스택 (Technology Stack)
 
-  * **프론트엔드:** Next.js 15.3 (TypeScript)
+  * **프론트엔드:** Next.js 15.5.3 (TypeScript)
   * **마크다운 렌더링:** react-markdown, remark-gfm
-  * **백엔드:** Python 3.12, FastAPI 0.110.0
-  * **AI 모델:** Google Gemini 2.5 Flash API
+  * **백엔드:** Python 3.13.7, FastAPI 0.116.1
+    * 공식 문서: https://fastapi.tiangolo.com/reference/
+    * GitHub 저장소: https://github.com/fastapi/fastapi
+    * 특징: 고성능, 자동 문서화, 타입 힌트 지원
+  * **AI 모델:** Google Gemini 2.5 Flash API (google-genai Python SDK)
   * **클라우드 스토리지:** Google Cloud Storage
   * **배포:** Vercel (Frontend), Render (Backend)
 
@@ -196,14 +224,15 @@ Rules:
 
   * 업로드된 이미지는 처리 완료 후 즉시 삭제한다. (프로덕션 기본값)
   * 선택적 스토리지(GCS)는 개발/디버깅 목적의 일시 보관에만 사용하며 만료 정책을 적용한다.
-  * API 키는 환경 변수로 관리하고 서버 사이드에서만 사용한다.
+  * Gemini API 키는 환경 변수로 관리하고 서버 사이드에서만 사용한다.
+  * Google Gen AI SDK의 안전 설정을 적용하여 부적절한 콘텐츠 생성을 방지한다.
   * 파일 크기 제한(예: 10MB)과 허용 확장자(PNG, JPEG) 검증을 수행한다.
 
 -----
 
 ### ## 7. 성능 최적화 (Performance)
 
-  * Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
+  * Google Gen AI Python SDK를 통한 Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
   * 동일 이미지 반복 분석에 대한 캐싱 전략(해시 기반 중복 방지)을 적용한다.
   * 비동기 I/O로 업로드/LLM 호출/파싱 파이프라인을 병렬화한다.
 

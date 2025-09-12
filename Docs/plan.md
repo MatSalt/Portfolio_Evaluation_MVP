@@ -3,7 +3,7 @@
 ## 📋 프로젝트 개요
 포트폴리오 화면 캡처를 업로드하면 AI가 종합적인 투자 분석을 수행하여 전문가 수준의 포트폴리오 평가 리포트를 제공하는 MVP
 
-**목표**: 2025년 9월 12일 기준 최신 기술 스택으로 안정적이고 확장 가능한 MVP 구현
+**목표**: 2025년 9월 12일 기준 최신 기술 스택(Next.js 15.5.3, FastAPI 0.116.1, Python 3.13.7)으로 안정적이고 확장 가능한 MVP 구현
 
 ---
 
@@ -16,7 +16,9 @@ mkdir -p frontend backend
 ```
 
 #### **프론트엔드 설정**
-- [ ] Next.js 15.3 프로젝트 생성 (`npx create-next-app@latest frontend --typescript --tailwind --app`)
+- [ ] Next.js 15.5.3 프로젝트 생성 (`npx create-next-app@latest frontend --typescript --tailwind --app`)
+- [ ] **Next.js 공식 문서 참고 필수**: https://nextjs.org/docs, https://github.com/vercel/next.js
+- [ ] **Next.js LLMS 상세 정보 참고**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt`
 - [ ] 필수 의존성 설치:
   - `react-markdown` (마크다운 렌더링)
   - `remark-gfm` (마크다운 확장)
@@ -24,13 +26,14 @@ mkdir -p frontend backend
 - [ ] TypeScript strict 모드 활성화
 
 #### **백엔드 설정**
-- [ ] Python 3.12 가상환경 생성
-- [ ] FastAPI 0.110.0 프로젝트 구조 생성
+- [ ] Python 3.13.7 가상환경 생성
+- [ ] FastAPI 0.116.1 프로젝트 구조 생성
+- [ ] **FastAPI 공식 문서 참고 필수**: https://fastapi.tiangolo.com/reference/, https://github.com/fastapi/fastapi
 - [ ] 필수 의존성 설치:
   - `fastapi`
   - `uvicorn`
   - `python-multipart`
-  - `google-generativeai`
+  - `google-genai`
   - `pydantic`
   - `python-dotenv`
 - [ ] 환경변수 파일 (.env) 설정
@@ -44,7 +47,9 @@ mkdir -p frontend backend
 
 ## 🔧 Phase 2: 백엔드 핵심 기능 구현 (3-4일)
 
-### 2.1 FastAPI 기본 구조 구축
+**참고 자료**: Gemini API 상세 정보는 `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt` 파일을 참고하세요.
+
+### 2.1 FastAPI 기본 구조 구축 (공식 문서 참고 필수)
 ```
 backend/
 ├── main.py                  # FastAPI 앱 진입점
@@ -90,6 +95,8 @@ backend/
   - expected_result.md 형식에 맞춘 구조화된 JSON 응답 요청
   - 한국어 분석 결과 생성 지시
 - [ ] **API 호출 최적화**:
+  - Google Gen AI Python SDK 사용
+  - **Gemini LLMS 상세 정보 참고**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
   - 비동기 처리 (async/await)
   - 타임아웃 설정 (30초)
   - 재시도 로직 (최대 3회)
@@ -108,6 +115,8 @@ backend/
 ---
 
 ## 🎨 Phase 3: 프론트엔드 UI/UX 구현 (3-4일)
+
+**참고 자료**: Next.js LLMS 상세 정보는 `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/nextjs-llms-full.txt` 파일을 참고하세요.
 
 ### 3.1 컴포넌트 구조 설계
 ```
