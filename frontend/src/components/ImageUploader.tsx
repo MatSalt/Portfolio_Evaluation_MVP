@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useRef, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Upload, X, AlertCircle, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { UploadState } from '@/types/portfolio';
 
@@ -140,10 +141,15 @@ export default function ImageUploader({
           {uploadState.status === 'success' && uploadState.preview && (
             <div className="text-center">
               <div className="relative inline-block mb-4">
-                <img
+                <Image
                   src={uploadState.preview}
                   alt="업로드된 포트폴리오 미리보기"
-                  className="max-w-full max-h-48 rounded-lg shadow-md"
+                  width={400}
+                  height={300}
+                  className="max-w-full max-h-48 rounded-lg shadow-md object-contain"
+                  priority={false}
+                  placeholder="blur"
+                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                 />
                 <button
                   onClick={(e) => {

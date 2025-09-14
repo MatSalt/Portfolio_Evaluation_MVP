@@ -1,11 +1,29 @@
 // src/app/page.tsx
 'use client';
 
-import { useState } from 'react';
-import ImageUploader from '@/components/ImageUploader';
-import AnalysisDisplay from '@/components/AnalysisDisplay';
+import { useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { usePortfolioAnalysis } from '@/hooks/usePortfolioAnalysis';
-import { BarChart3, Sparkles, ArrowRight } from 'lucide-react';
+import { BarChart3, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+
+// Dynamic imports for code splitting
+const ImageUploader = dynamic(() => import('@/components/ImageUploader'), {
+  loading: () => (
+    <div className="flex justify-center items-center p-8">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+    </div>
+  ),
+});
+
+const AnalysisDisplay = dynamic(() => import('@/components/AnalysisDisplay'), {
+  loading: () => (
+    <div className="flex justify-center items-center p-8">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+    </div>
+  ),
+});
+
+const ErrorBoundary = dynamic(() => import('@/components/ErrorBoundary'));
 
 export default function Home() {
   const {
@@ -30,9 +48,10 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
+      <header className="bg-white border-b border-gray-200 shadow-sm" role="banner">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
             <div className="flex items-center space-x-3">
@@ -53,9 +72,9 @@ export default function Home() {
       </header>
 
       {/* 메인 컨텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" role="main">
         {/* 단계 표시기 */}
-        <div className="mb-8">
+        <div className="mb-8" role="progressbar" aria-label="분석 진행 단계">
           <div className="flex items-center justify-center space-x-4 mb-4">
             {/* 1단계: 업로드 */}
             <div className={`flex items-center ${
@@ -123,12 +142,18 @@ export default function Home() {
                 </p>
               </div>
 
-              <ImageUploader
-                uploadState={uploadState}
-                onFileSelect={handleFileSelect}
-                onRemoveFile={removeFile}
-                disabled={isLoading}
-              />
+              <Suspense fallback={
+                <div className="flex justify-center items-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              }>
+                <ImageUploader
+                  uploadState={uploadState}
+                  onFileSelect={handleFileSelect}
+                  onRemoveFile={removeFile}
+                  disabled={isLoading}
+                />
+              </Suspense>
 
               {/* 분석 버튼 */}
               {canAnalyze && analysisState.status === 'idle' && (
@@ -149,10 +174,16 @@ export default function Home() {
           {/* 분석 결과 영역 */}
           {analysisState.status !== 'idle' && (
             <section>
-              <AnalysisDisplay 
-                analysisState={analysisState}
-                onRetry={handleAnalyzeClick}
-              />
+              <Suspense fallback={
+                <div className="flex justify-center items-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              }>
+                <AnalysisDisplay 
+                  analysisState={analysisState}
+                  onRetry={handleAnalyzeClick}
+                />
+              </Suspense>
 
               {/* 다시 분석하기 버튼 */}
               {analysisState.status === 'success' && (
@@ -223,7 +254,7 @@ export default function Home() {
       </main>
 
       {/* 푸터 */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
+      <footer className="bg-white border-t border-gray-200 mt-16" role="contentinfo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-sm text-gray-500">
             <p>© 2025 포트폴리오 스코어. All rights reserved.</p>
@@ -234,5 +265,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
+    </ErrorBoundary>
   );
 }
