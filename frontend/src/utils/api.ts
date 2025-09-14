@@ -1,0 +1,132 @@
+// src/utils/api.ts
+import { AnalysisResponse, ApiError } from '@/types/portfolio';
+
+/**
+ * API 기본 설정
+ */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_TIMEOUT = 60000; // 60초
+
+/**
+ * 커스텀 fetch 에러 클래스
+ */
+export class ApiException extends Error {
+  constructor(
+    message: string, 
+    public status: number, 
+    public response?: any
+  ) {
+    super(message);
+    this.name = 'ApiException';
+  }
+}
+
+/**
+ * 포트폴리오 이미지를 분석하는 API 함수
+ * @param file - 분석할 이미지 파일
+ * @returns Promise<AnalysisResponse> - 분석 결과
+ */
+export async function analyzePortfolio(file: File): Promise<AnalysisResponse> {
+  // FormData 생성
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+      // Content-Type은 FormData 사용 시 자동 설정되므로 명시하지 않음
+    });
+
+    clearTimeout(timeoutId);
+
+    // 응답 상태 확인
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}`;
+      
+      try {
+        const errorData: ApiError = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        // JSON 파싱 실패 시 기본 메시지 사용
+        errorMessage = `서버 오류 (${response.status})`;
+      }
+
+      throw new ApiException(errorMessage, response.status);
+    }
+
+    // 성공 응답 파싱
+    const data: AnalysisResponse = await response.json();
+    
+    // 응답 데이터 유효성 검사
+    if (!data.content || typeof data.content !== 'string') {
+      throw new ApiException('잘못된 응답 형식', 500);
+    }
+
+    return data;
+
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new ApiException('요청 시간이 초과되었습니다. 다시 시도해 주세요.', 408);
+    }
+    
+    if (error instanceof ApiException) {
+      throw error;
+    }
+
+    // 네트워크 오류 등
+    throw new ApiException('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해 주세요.', 0);
+  }
+}
+
+/**
+ * 파일 유효성 검사
+ * @param file - 검사할 파일
+ * @returns FileValidationResult - 검사 결과
+ */
+export function validateImageFile(file: File): { isValid: boolean; error?: string } {
+  // 파일 타입 검사
+  const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+  if (!supportedTypes.includes(file.type)) {
+    return {
+      isValid: false,
+      error: 'PNG, JPEG 파일만 업로드 가능합니다.'
+    };
+  }
+
+  // 파일 크기 검사 (10MB)
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    return {
+      isValid: false,
+      error: '파일 크기는 10MB 이하만 허용됩니다.'
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * 파일을 Base64로 변환
+ * @param file - 변환할 파일
+ * @returns Promise<string> - Base64 문자열
+ */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('파일 읽기 실패'));
+      }
+    };
+    reader.onerror = () => reject(new Error('파일 읽기 중 오류 발생'));
+    reader.readAsDataURL(file);
+  });
+}
