@@ -145,7 +145,7 @@ class GeminiService:
                 logger.info(f"Gemini API 호출 시도 {attempt + 1}/{self.max_retries}")
                 
                 # 이미지 파트 생성
-                image_part = Part.from_data(
+                image_part = Part.from_bytes(
                     data=base64.b64decode(image_base64),
                     mime_type="image/jpeg"
                 )
@@ -159,14 +159,11 @@ class GeminiService:
                     response_mime_type="text/plain"  # 플레인 텍스트 (마크다운)
                 )
                 
-                # API 호출
-                response = await asyncio.wait_for(
-                    self.client.agenerate_content(
-                        model=self.model_name,
-                        contents=[prompt, image_part],
-                        config=config
-                    ),
-                    timeout=self.timeout
+                # API 호출 (동기 호출)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt, image_part],
+                    config=config
                 )
                 
                 if response and response.text:

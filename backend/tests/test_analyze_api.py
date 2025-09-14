@@ -1,8 +1,18 @@
+"""
+분석 API 엔드포인트 테스트
+
+이 모듈은 포트폴리오 분석 API 엔드포인트의 통합 테스트를 제공합니다.
+"""
+
 import pytest
+import os
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from main import app
 from models.portfolio import SAMPLE_MARKDOWN_CONTENT
+
+# 테스트용 환경변수 설정
+os.environ['GEMINI_API_KEY'] = 'test_api_key'
 
 client = TestClient(app)
 
@@ -12,24 +22,30 @@ class TestAnalyzeAPI:
     @pytest.fixture
     def sample_image_file(self):
         """테스트용 이미지 파일"""
+        from PIL import Image
+        from io import BytesIO
+        
+        # 실제 이미지 생성
+        img = Image.new('RGB', (500, 500), color='red')
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=85)
+        image_data = buffer.getvalue()
+        
         return {
-            "file": ("test.jpg", b"fake_image_data", "image/jpeg")
+            "file": ("test.jpg", image_data, "image/jpeg")
         }
     
-    @patch('api.analyze.get_gemini_service')
+    @patch('services.gemini_service.GeminiService.analyze_portfolio_image')
     @patch('utils.image_utils.validate_image')
     @patch('utils.image_utils.get_image_info')
     def test_analyze_portfolio_success(
-        self, mock_get_info, mock_validate, mock_get_service, sample_image_file
+        self, mock_get_info, mock_validate, mock_analyze, sample_image_file
     ):
         """포트폴리오 분석 성공 테스트"""
         # Mock 설정
         mock_validate.return_value = None
         mock_get_info.return_value = {"format": "JPEG", "size": (1024, 768)}
-        
-        mock_service = AsyncMock()
-        mock_service.analyze_portfolio_image.return_value = SAMPLE_MARKDOWN_CONTENT
-        mock_get_service.return_value = mock_service
+        mock_analyze.return_value = SAMPLE_MARKDOWN_CONTENT
         
         # API 호출
         response = client.post("/api/analyze", files=sample_image_file)

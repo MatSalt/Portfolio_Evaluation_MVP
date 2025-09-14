@@ -5,7 +5,7 @@
 마크다운 텍스트 출력 방식에 최적화된 간단한 구조를 제공합니다.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from enum import Enum
 import time
@@ -29,7 +29,8 @@ class AnalysisResponse(BaseModel):
     processing_time: float = Field(..., description="처리 시간 (초)")
     request_id: str = Field(..., description="요청 ID")
     
-    @validator('content')
+    @field_validator('content')
+    @classmethod
     def validate_content(cls, v):
         if not v or len(v.strip()) < 100:
             raise ValueError('분석 결과는 최소 100자 이상이어야 합니다.')

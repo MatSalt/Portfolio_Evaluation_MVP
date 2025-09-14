@@ -1,3 +1,9 @@
+"""
+Gemini 서비스 테스트
+
+이 모듈은 GeminiService 클래스의 단위 테스트를 제공합니다.
+"""
+
 import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
@@ -47,6 +53,7 @@ class TestGeminiService:
     @patch.dict('os.environ', {'GEMINI_API_KEY': 'test_api_key'})
     @patch('services.gemini_service.validate_image')
     @patch('services.gemini_service.optimize_image')
+    @pytest.mark.asyncio
     async def test_analyze_portfolio_image_success(
         self, mock_optimize, mock_validate, mock_image_data, sample_markdown_response
     ):
@@ -69,6 +76,7 @@ class TestGeminiService:
             assert "**3대 핵심 기준 스코어:**" in result
     
     @patch.dict('os.environ', {'GEMINI_API_KEY': 'test_api_key'})
+    @pytest.mark.asyncio
     async def test_get_sample_analysis(self):
         """샘플 분석 결과 반환 테스트"""
         service = GeminiService()
