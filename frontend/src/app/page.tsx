@@ -138,7 +138,7 @@ export default function Home() {
                 </h2>
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                   증권사 앱의 포트폴리오 화면을 캡처하여 업로드하면, 
-                  AI가 전문가 수준의 투자 분석을 제공합니다.
+                  AI가 최신 시장 정보를 검색하여 전문가 수준의 투자 분석을 제공합니다.
                 </p>
               </div>
 
@@ -231,8 +231,8 @@ export default function Home() {
                   즉시 결과 확인
                 </h4>
                 <p className="text-gray-600">
-                  이미지 업로드 후 1분 이내에 
-                  상세한 분석 리포트를 받아보세요.
+                  이미지 업로드 후 2분 이내에 
+                  최신 시장 정보 기반 상세한 분석 리포트를 받아보세요.
                 </p>
               </div>
 

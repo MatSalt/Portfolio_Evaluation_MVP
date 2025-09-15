@@ -5,7 +5,7 @@ import { AnalysisResponse, ApiError } from '@/types/portfolio';
  * API 기본 설정
  */
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_TIMEOUT = 60000; // 60초
+const API_TIMEOUT = 120000; // 120초 (Google Search 포함)
 
 /**
  * 커스텀 fetch 에러 클래스

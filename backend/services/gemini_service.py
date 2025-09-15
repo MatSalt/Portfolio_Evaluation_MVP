@@ -35,7 +35,7 @@ class GeminiService:
         
         # 설정값
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "30"))
+        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "120"))  # Google Search 포함
         self.max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
         
         # 캐시 딕셔너리 (실제 환경에서는 Redis 등 사용)

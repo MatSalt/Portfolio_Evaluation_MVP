@@ -44,16 +44,23 @@ export default function AnalysisDisplay({
             <div className="space-y-3 text-sm text-gray-600">
               <p className="flex items-center justify-center">
                 <Clock className="h-4 w-4 mr-2" />
-                일반적으로 30-60초 소요됩니다
+                Google Search 포함 최대 2분 소요됩니다
               </p>
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="font-medium mb-2">분석 진행 중...</p>
+                <p className="font-medium mb-2">AI 분석 진행 중...</p>
+                <p className="text-sm text-gray-600 mb-3">
+                  최신 시장 정보를 검색하여 정확한 분석을 수행하고 있습니다.
+                </p>
                 <ul className="text-left space-y-1 text-xs">
                   <li>• 포트폴리오 이미지 인식</li>
                   <li>• 보유 종목 데이터 추출</li>
+                  <li>• 최신 시장 정보 검색</li>
                   <li>• AI 전문가 분석 수행</li>
                   <li>• 종합 리포트 생성</li>
                 </ul>
+                <p className="text-xs text-gray-500 mt-3">
+                  분석에는 최대 2분이 소요될 수 있습니다.
+                </p>
               </div>
             </div>
           </div>
