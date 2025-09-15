@@ -52,12 +52,7 @@ export const metadata: Metadata = {
     description: "증권사 앱의 포트폴리오 스크린샷을 업로드하면 AI가 전문가 수준의 투자 분석을 제공합니다.",
     images: ["/og-image.png"],
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  themeColor: "#3B82F6",
+  metadataBase: new URL('https://portfolio-score.vercel.app'),
 };
 
 export default function RootLayout({
