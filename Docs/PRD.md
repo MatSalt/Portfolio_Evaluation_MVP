@@ -80,23 +80,37 @@
 
 #### **3.1. Gemini API 통합 및 프롬프트 (Gemini API Integration & Prompt)**
 
-백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, **expected_result.md와 동일한 마크다운 형식의 분석 결과**를 생성하도록 지시합니다.
+백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, **Google Search를 통한 실시간 정보 검색**과 함께 **expected_result.md와 동일한 마크다운 형식의 분석 결과**를 생성하도록 지시합니다.
 
-**Google Gen AI Python SDK 사용법:**
+**Google Gen AI Python SDK 사용법 (Google Search 통합):**
 ```python
 from google import genai
 
 # API 키 설정
 client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
 
-# 이미지와 프롬프트로 포트폴리오 분석 요청
+# Google Search 도구를 포함한 모델 구성
+tools = [{"google_search": {}}]
+config = {"tools": tools}
+
+# 이미지와 프롬프트로 포트폴리오 분석 요청 (Google Search 활성화)
 response = client.models.generate_content(
     model='gemini-2.5-flash',
-    contents=[prompt_text, image_data]
+    contents=[prompt_text, image_data],
+    tools=tools
 )
 ```
 
-**참고 자료**: Gemini API 상세 정보는 `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt` 파일을 참고하세요.
+**Google Search 기능 특징:**
+- **실시간 정보 검색**: 최신 시장 동향, 뉴스, 재무 정보를 실시간으로 검색
+- **정확성 향상**: 웹 기반 최신 데이터로 분석의 정확성과 신뢰성 향상
+- **출처 제공**: 검색된 정보의 출처를 자동으로 포함하여 투명성 확보
+- **환각 현상 방지**: 실제 웹 데이터 기반으로 응답하여 부정확한 정보 생성 방지
+
+**참고 자료**: 
+- Gemini API 상세 정보: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
+- Google Search 통합: https://ai.google.dev/gemini-api/docs/google-search?hl=ko
+- Live API 도구 사용: https://ai.google.dev/gemini-api/docs/live-tools?hl=ko
 
 ```text
 당신은 포트폴리오 분석 전문가입니다. 제공된 증권사 앱 스크린샷에서 보유 종목을 추출하고 종합적인 투자 분석을 수행하세요.
@@ -205,6 +219,8 @@ response = client.models.generate_content(
     * GitHub 저장소: https://github.com/fastapi/fastapi
     * 특징: 고성능, 자동 문서화, 타입 힌트 지원
   * **AI 모델:** Google Gemini 2.5 Flash API (google-genai Python SDK)
+    * **Google Search 통합**: Gemini API의 `google_search` 도구를 활용한 실시간 웹 검색
+    * **그라운딩 기능**: 검색된 정보를 기반으로 한 정확한 분석 제공
   * **클라우드 스토리지:** Google Cloud Storage
   * **배포:** Vercel (Frontend), Render (Backend)
 
@@ -233,14 +249,17 @@ response = client.models.generate_content(
 ### ## 7. 성능 최적화 (Performance)
 
   * Google Gen AI Python SDK를 통한 Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
+  * **Google Search 최적화**: 검색 쿼리를 효율적으로 구성하여 관련성 높은 정보만 검색하고 응답 시간을 단축한다.
   * 동일 이미지 반복 분석에 대한 캐싱 전략(해시 기반 중복 방지)을 적용한다.
-  * 비동기 I/O로 업로드/LLM 호출 파이프라인을 병렬화한다.
+  * 비동기 I/O로 업로드/LLM 호출/Google Search 파이프라인을 병렬화한다.
+  * **검색 결과 캐싱**: 동일한 검색 쿼리에 대해 일정 시간 동안 캐시된 결과를 활용하여 API 호출 비용을 절약한다.
 
 -----
 
 ### ## 8. 테스트 및 배포 (Testing & CI/CD)
 
-  * 단위 테스트: 이미지 처리 로직, 프롬프트 유효성 테스트.
-  * 통합 테스트: 실제 샘플 스크린샷으로 엔드투엔드 검증.
-  * 사용자 수용 테스트(UAT): 다양한 브로커리지 UI 스킨에 대한 견고성 확인.
-  * CI/CD: 메인 병합 시 자동 빌드/배포(프론트: Vercel, 백엔드: Render), 시크릿 관리.
+  * 단위 테스트: 이미지 처리 로직, 프롬프트 유효성 테스트, Google Search API 호출 테스트.
+  * 통합 테스트: 실제 샘플 스크린샷으로 엔드투엔드 검증, Google Search 결과 검증.
+  * **Google Search 테스트**: 검색 쿼리 생성, 결과 파싱, 출처 정보 추출 테스트.
+  * 사용자 수용 테스트(UAT): 다양한 브로커리지 UI 스킨에 대한 견고성 확인, 검색 결과 정확성 검증.
+  * CI/CD: 메인 병합 시 자동 빌드/배포(프론트: Vercel, 백엔드: Render), 시크릿 관리, Google Search API 키 관리.

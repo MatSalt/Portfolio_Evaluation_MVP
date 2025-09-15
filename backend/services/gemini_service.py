@@ -41,7 +41,7 @@ class GeminiService:
         # 캐시 딕셔너리 (실제 환경에서는 Redis 등 사용)
         self._cache: Dict[str, str] = {}
         
-        logger.info(f"GeminiService 초기화 완료 - 모델: {self.model_name}, 출력: 마크다운 텍스트")
+        logger.info(f"GeminiService 초기화 완료 - 모델: {self.model_name}, 출력: 마크다운 텍스트, Google Search: 활성화")
 
     def _generate_image_hash(self, image_data: bytes) -> str:
         """이미지 데이터의 해시값 생성"""
@@ -142,7 +142,7 @@ class GeminiService:
         """Gemini API 호출 - 마크다운 텍스트 반환"""
         for attempt in range(self.max_retries):
             try:
-                logger.info(f"Gemini API 호출 시도 {attempt + 1}/{self.max_retries}")
+                logger.info(f"Gemini API 호출 시도 {attempt + 1}/{self.max_retries} (Google Search 활성화)")
                 
                 # 이미지 파트 생성
                 image_part = Part.from_bytes(
@@ -159,6 +159,15 @@ class GeminiService:
                     response_mime_type="text/plain"  # 플레인 텍스트 (마크다운)
                 )
                 
+                # Google Search 도구 활성화 (올바른 방식)
+                from google.genai import types
+                grounding_tool = types.Tool(
+                    google_search=types.GoogleSearch()
+                )
+                
+                # config에 tools 추가
+                config.tools = [grounding_tool]
+                
                 # API 호출 (동기 호출)
                 response = self.client.models.generate_content(
                     model=self.model_name,
@@ -168,7 +177,7 @@ class GeminiService:
                 
                 if response and response.text:
                     markdown_text = response.text.strip()
-                    logger.info("Gemini API 마크다운 응답 성공")
+                    logger.info("Gemini API 마크다운 응답 성공 (Google Search 통합)")
                     return markdown_text
                 else:
                     raise ValueError("Gemini API에서 빈 응답 받음")
@@ -181,6 +190,11 @@ class GeminiService:
                 
             except Exception as e:
                 logger.error(f"Gemini API 호출 실패 (시도 {attempt + 1}): {str(e)}")
+                
+                # Google Search 관련 오류인 경우 특별 처리
+                if "search" in str(e).lower():
+                    logger.warning("Google Search 기능 관련 오류, 기본 분석으로 계속 진행")
+                
                 if attempt == self.max_retries - 1:
                     raise
                 await asyncio.sleep(2 ** attempt)

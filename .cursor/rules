@@ -1,12 +1,14 @@
 # Portfolio Evaluation MVP - Cursor Rules
 
 ## 프로젝트 개요
-이 프로젝트는 AI Vision 모델을 사용하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, expected_result.md와 동일한 형식의 마크다운 텍스트로 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
+이 프로젝트는 AI Vision 모델과 Google Search 기능을 통합하여 증권사 앱의 포트폴리오 스크린샷을 분석하고, expected_result.md와 동일한 형식의 마크다운 텍스트로 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
 
 ## 기술 스택
 - **프론트엔드**: Next.js 15.5.3 (TypeScript)
 - **백엔드**: Python 3.13.7, FastAPI 0.116.1
 - **AI 모델**: Google Gemini 2.5 Flash API (google-genai Python SDK)
+  - **Google Search 통합**: Gemini API의 `google_search` 도구를 활용한 실시간 웹 검색
+  - **그라운딩 기능**: 검색된 정보를 기반으로 한 정확한 분석 제공
 - **마크다운 렌더링**: react-markdown, remark-gfm
 - **배포**: Vercel (Frontend), Render (Backend)
 
@@ -66,15 +68,22 @@
    - GitHub: https://github.com/googleapis/python-genai
    - 공식 문서: https://googleapis.github.io/python-genai/
    - **Gemini LLMS 상세 정보**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
+   - **Google Search 통합**: https://ai.google.dev/gemini-api/docs/google-search?hl=ko
+   - **Live API 도구 사용**: https://ai.google.dev/gemini-api/docs/live-tools?hl=ko
 4. 이미지는 Base64로 인코딩하여 전송합니다.
-5. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 expected_result.md와 동일한 마크다운 형식으로 다음을 생성하도록 합니다:
+5. **Google Search 도구를 활성화하여 실시간 웹 검색 기능을 활용합니다**:
+   ```python
+   tools = [{"google_search": {}}]
+   config = {"tools": tools}
+   ```
+6. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 expected_result.md와 동일한 마크다운 형식으로 다음을 생성하도록 합니다:
    - AI 총평 (2-3문장)
    - 종합 리니아 스코어 (0-100)
    - 3대 핵심 기준 스코어 (성장 잠재력, 안정성 및 방어력, 전략적 일관성)
    - 상세 분석 (각 기준별 3-4문장)
    - 강점/약점/기회 분석 (실행 가능한 인사이트 및 What-if 시나리오 포함)
    - 개별 종목별 5가지 평가 기준 점수 및 상세 분석
-6. API 호출 시 상세하고 높은 품질의 마크다운 텍스트 응답을 얻도록 최적화합니다.
+7. API 호출 시 상세하고 높은 품질의 마크다운 텍스트 응답을 얻도록 최적화합니다.
 
 ### API 설계
 1. 이미지 업로드: `POST /api/analyze`
@@ -98,8 +107,9 @@
 ## 개발 우선순위
 1. 이미지 업로드 기능
 2. Gemini Vision API 연동
-3. 마크다운 텍스트 렌더링
-4. 에러 처리 및 사용자 피드백
+3. Google Search 기능 통합
+4. 마크다운 텍스트 렌더링
+5. 에러 처리 및 사용자 피드백
 
 ## 테스트
 - 프론트엔드: Jest + React Testing Library

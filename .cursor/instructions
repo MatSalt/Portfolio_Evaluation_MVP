@@ -6,9 +6,10 @@
 ## 핵심 기능
 1. **이미지 업로드**: 드래그 앤 드롭 또는 파일 선택으로 포트폴리오 스크린샷 업로드
 2. **AI 분석**: Google Gemini 2.5 Flash API (google-genai Python SDK)를 사용한 종합적인 포트폴리오 분석
-3. **전문 분석 리포트**: AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목 상세 분석
-4. **마크다운 표시**: 분석 결과를 마크다운 텍스트로 화면에 렌더링
-5. **에러 처리**: 사용자 친화적인 에러 메시지 표시
+3. **Google Search 통합**: 실시간 웹 검색을 통한 최신 시장 정보 및 뉴스 검색
+4. **전문 분석 리포트**: AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목 상세 분석
+5. **마크다운 표시**: 분석 결과를 마크다운 텍스트로 화면에 렌더링
+6. **에러 처리**: 사용자 친화적인 에러 메시지 표시
 
 ## 개발 시 주의사항
 
@@ -38,6 +39,7 @@
 - `google-genai` Python SDK 최신 버전 사용
 - **Gemini LLMS 상세 정보 참고**: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
 - Gemini 2.5 Flash 모델의 Vision 기능 활용
+- **Google Search 통합**: `google_search` 도구를 활성화하여 실시간 웹 검색 기능 활용
 - 이미지 전처리 (크기 조정, 압축 등)
 - 포트폴리오 분석 전문가 역할의 프롬프트 설계:
   - expected_result.md와 동일한 마크다운 형식으로 출력 요청
@@ -106,19 +108,30 @@
    - 다양한 이미지 형식 테스트
    - 에러 케이스 테스트
 
-## Gemini API 사용법
+## Gemini API 사용법 (Google Search 통합)
 ```python
 from google import genai
 
 # API 키 설정
 client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
 
-# 이미지와 프롬프트로 포트폴리오 분석 요청
+# Google Search 도구를 포함한 모델 구성
+tools = [{"google_search": {}}]
+config = {"tools": tools}
+
+# 이미지와 프롬프트로 포트폴리오 분석 요청 (Google Search 활성화)
 response = client.models.generate_content(
     model='gemini-2.5-flash',
-    contents=[prompt_text, image_data]
+    contents=[prompt_text, image_data],
+    tools=tools
 )
 ```
+
+## Google Search 기능 특징
+- **실시간 정보 검색**: 최신 시장 동향, 뉴스, 재무 정보를 실시간으로 검색
+- **정확성 향상**: 웹 기반 최신 데이터로 분석의 정확성과 신뢰성 향상
+- **출처 제공**: 검색된 정보의 출처를 자동으로 포함하여 투명성 확보
+- **환각 현상 방지**: 실제 웹 데이터 기반으로 응답하여 부정확한 정보 생성 방지
 
 ## 테스트 전략
 - **단위 테스트**: 각 컴포넌트와 함수별 테스트
