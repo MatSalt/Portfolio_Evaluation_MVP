@@ -22,25 +22,35 @@ export class ApiException extends Error {
 }
 
 /**
- * 포트폴리오 이미지를 분석하는 API 함수
- * @param file - 분석할 이미지 파일
+ * 포트폴리오 이미지를 분석하는 API 함수 (다중 파일 지원)
+ * @param files - 분석할 이미지 파일들
  * @returns Promise<AnalysisResponse> - 분석 결과
  */
-export async function analyzePortfolio(file: File): Promise<AnalysisResponse> {
-  // FormData 생성
+export async function analyzePortfolio(files: File[]): Promise<AnalysisResponse> {
+  // 파일 배열 검증
+  if (!files || files.length === 0) {
+    throw new ApiException('분석할 파일이 없습니다.', 400);
+  }
+
+  if (files.length > 5) {
+    throw new ApiException('최대 5개의 파일만 업로드 가능합니다.', 400);
+  }
+
+  // FormData 생성 (다중 파일 지원)
   const formData = new FormData();
-  formData.append('file', file);
+  files.forEach(file => {
+    formData.append('files', file); // 'files' 필드명으로 여러 파일 추가
+  });
 
   try {
-    // AbortController for timeout
+    // AbortController for timeout (다중 파일용 타임아웃 증가)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5분으로 증가
 
     const response = await fetch(`${API_BASE_URL}/api/analyze`, {
       method: 'POST',
       body: formData,
       signal: controller.signal,
-      // Content-Type은 FormData 사용 시 자동 설정되므로 명시하지 않음
     });
 
     clearTimeout(timeoutId);
@@ -53,7 +63,6 @@ export async function analyzePortfolio(file: File): Promise<AnalysisResponse> {
         const errorData: ApiError = await response.json();
         errorMessage = errorData.error || errorMessage;
       } catch {
-        // JSON 파싱 실패 시 기본 메시지 사용
         errorMessage = `서버 오류 (${response.status})`;
       }
 

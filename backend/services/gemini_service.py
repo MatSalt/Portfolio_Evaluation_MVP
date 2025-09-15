@@ -9,7 +9,7 @@ import os
 import asyncio
 import base64
 import hashlib
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from io import BytesIO
 import logging
 from google import genai
@@ -35,17 +35,27 @@ class GeminiService:
         
         # 설정값
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "120"))  # Google Search 포함
+        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "180"))  # 다중 이미지 처리를 위한 타임아웃 증가 (3분)
         self.max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
         
         # 캐시 딕셔너리 (실제 환경에서는 Redis 등 사용)
         self._cache: Dict[str, str] = {}
         
-        logger.info(f"GeminiService 초기화 완료 - 모델: {self.model_name}, 출력: 마크다운 텍스트, Google Search: 활성화")
+        logger.info(f"GeminiService 초기화 완료 - 모델: {self.model_name}, 출력: 마크다운 텍스트, Google Search: 활성화, 다중 이미지: 지원")
 
     def _generate_image_hash(self, image_data: bytes) -> str:
         """이미지 데이터의 해시값 생성"""
         return hashlib.md5(image_data).hexdigest()
+
+    def _generate_multiple_cache_key(self, image_data_list: List[bytes]) -> str:
+        """다중 이미지용 캐시 키 생성"""
+        # 모든 이미지의 해시를 조합하여 캐시 키 생성
+        combined_hash = hashlib.md5()
+        for image_data in image_data_list:
+            image_hash = hashlib.md5(image_data).hexdigest()
+            combined_hash.update(image_hash.encode())
+        
+        return f"multiple_{len(image_data_list)}_{combined_hash.hexdigest()}"
 
     def _get_portfolio_analysis_prompt(self) -> str:
         """포트폴리오 분석용 마크다운 프롬프트 생성"""
@@ -128,6 +138,90 @@ class GeminiService:
 **반드시 마크다운 형식만 출력하고, JSON이나 다른 형식은 사용하지 마세요.**
 """
 
+    def _get_multiple_image_prompt(self) -> str:
+        """다중 이미지 분석용 프롬프트"""
+        return """
+        당신은 포트폴리오 분석 전문가입니다. 위에 제공된 여러 포트폴리오 이미지들을 종합적으로 분석해주세요.
+
+        각 이미지를 개별적으로 분석한 후, 전체적인 포트폴리오 상황을 종합하여 
+        다음 마크다운 형식으로 정확히 출력하세요 (추가 텍스트 없이):
+
+        **AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]
+
+        **포트폴리오 종합 리니아 스코어: [0-100] / 100**
+
+        **3대 핵심 기준 스코어:**
+
+        - **성장 잠재력:** [0-100] / 100
+        - **안정성 및 방어력:** [0-100] / 100
+        - **전략적 일관성:** [0-100] / 100
+
+        **[1] 포트폴리오 리니아 스코어 심층 분석**
+
+        **1.1 성장 잠재력 분석 ([점수] / 100): [제목]**
+
+        [3-4문장의 구체적 분석]
+
+        **1.2 안정성 및 방어력 분석 ([점수] / 100): [제목]**
+
+        [3-4문장의 구체적 분석]
+
+        **1.3 전략적 일관성 분석 ([점수] / 100): [제목]**
+
+        [3-4문장의 구체적 분석]
+
+        **[2] 포트폴리오 강점 및 약점, 그리고 기회**
+
+        **💪 강점**
+
+        - [강점 1: 1-2문장, 실행 가능한 인사이트]
+        - [강점 2: 1-2문장, 실행 가능한 인사이트]
+
+        **📉 약점**
+
+        - [약점 1: 1-2문장, 구체적 개선방안]
+        - [약점 2: 1-2문장, 구체적 개선방안]
+
+        **💡 기회 및 개선 방안**
+
+        - [기회 1: What-if 시나리오 포함]
+        - [기회 2: 구체적 실행 방안]
+
+        **[3] 개별 종목 리니아 스코어 상세 분석**
+
+        **3.1 스코어 요약 테이블**
+
+        | 주식 | Overall (100점 만점) | 펀더멘탈 | 기술 잠재력 | 거시경제 | 시장심리 | CEO/리더십 |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | [종목명] | [점수] | [점수] | [점수] | [점수] | [점수] | [점수] |
+
+        **3.2 개별 종목 분석 카드**
+
+        **[번호]. [종목명] - Overall: [점수] / 100**
+
+        - **펀더멘탈 ([점수]/100):** [상세 분석]
+        - **기술 잠재력 ([점수]/100):** [상세 분석]
+        - **거시경제 ([점수]/100):** [상세 분석]
+        - **시장심리 ([점수]/100):** [상세 분석]
+        - **CEO/리더십 ([점수]/100):** [상세 분석]
+
+        다중 이미지 분석 시 고려사항:
+        1. 각 이미지의 포트폴리오 구성을 개별적으로 분석
+        2. 시간에 따른 변화가 있다면 시계열 분석 포함
+        3. 전체적인 투자 전략의 일관성 평가
+        4. 리스크 분산 정도 종합 평가
+        5. 수익률 추이 분석 (여러 시점이 있는 경우)
+
+        분석 규칙:
+        - 모든 점수는 0-100 사이의 정수로 평가
+        - 각 분석은 구체적이고 전문적인 내용으로 작성
+        - 강점/약점/기회는 실행 가능한 인사이트 제공
+        - 기회에는 간단한 "What-if" 시나리오 포함
+        - 모든 텍스트는 한국어로 작성
+        - 전문적인 투자 분석 언어 사용
+        - 구체적인 예시와 데이터 포인트 포함
+        """
+
     async def _encode_image_to_base64(self, image_data: bytes) -> str:
         """이미지를 Base64로 인코딩"""
         try:
@@ -194,6 +288,96 @@ class GeminiService:
                 # Google Search 관련 오류인 경우 특별 처리
                 if "search" in str(e).lower():
                     logger.warning("Google Search 기능 관련 오류, 기본 분석으로 계속 진행")
+                
+                if attempt == self.max_retries - 1:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+
+    async def _call_gemini_api_multiple(self, image_data_list: List[bytes]) -> str:
+        """
+        Gemini API 다중 이미지 호출
+        
+        참고: https://ai.google.dev/gemini-api/docs/image-understanding?hl=ko
+        - 요청당 최대 3,600개 이미지 지원 (우리는 5개로 제한)
+        - 각 이미지는 768x768 타일로 처리되며 타일당 258 토큰
+        """
+        for attempt in range(self.max_retries):
+            try:
+                logger.info(f"Gemini API 다중 이미지 호출 시도 {attempt + 1}/{self.max_retries} (Google Search 활성화)")
+                
+                # contents 배열 구성 - 이미지들 먼저, 프롬프트는 마지막
+                contents = []
+                
+                # 1. 이미지들을 contents에 추가
+                for i, image_data in enumerate(image_data_list):
+                    try:
+                        image_part = Part.from_bytes(
+                            data=image_data,
+                            mime_type='image/jpeg'
+                        )
+                        contents.append(image_part)
+                        logger.debug(f"이미지 {i+1} 추가됨 (크기: {len(image_data)} bytes)")
+                    except Exception as e:
+                        logger.error(f"이미지 {i+1} 처리 실패: {str(e)}")
+                        raise ValueError(f"이미지 {i+1} 처리 중 오류가 발생했습니다.")
+                
+                # 2. 다중 이미지 분석 프롬프트 추가
+                prompt = self._get_multiple_image_prompt()
+                contents.append(prompt)
+                
+                # 3. Google Search 도구 설정
+                from google.genai import types
+                grounding_tool = types.Tool(
+                    google_search=types.GoogleSearch()
+                )
+                
+                # 4. 모델 설정
+                config = GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=8192,
+                    tools=[grounding_tool]
+                )
+                
+                # 5. API 호출 (타임아웃 설정)
+                try:
+                    response = self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=contents,
+                        config=config
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"Gemini API 다중 이미지 호출 타임아웃 (시도 {attempt + 1})")
+                    if attempt == self.max_retries - 1:
+                        raise TimeoutError(f"{self.timeout}초 내에 Gemini API 응답 없음 (다중 이미지)")
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                
+                if response and response.text:
+                    logger.info("Gemini API 다중 이미지 마크다운 응답 성공 (Google Search 통합)")
+                    return response.text
+                else:
+                    raise ValueError("Gemini API가 빈 응답을 반환했습니다.")
+                    
+            except TimeoutError:
+                # TimeoutError는 이미 처리됨
+                raise
+            except ValueError as e:
+                # ValueError는 재시도하지 않고 즉시 전파
+                logger.error(f"Gemini API 다중 이미지 호출 값 오류: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"Gemini API 다중 이미지 호출 실패 (시도 {attempt + 1}): {str(e)}")
+                
+                # 특정 에러 타입별 처리
+                error_str = str(e).lower()
+                if "search" in error_str:
+                    logger.warning("Google Search 기능 관련 오류, 기본 분석으로 계속 진행")
+                elif "quota" in error_str or "limit" in error_str:
+                    logger.error("API 할당량 초과 또는 제한 도달")
+                    raise ValueError("API 사용량이 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.")
+                elif "invalid" in error_str or "malformed" in error_str:
+                    logger.error("잘못된 요청 형식")
+                    raise ValueError("요청 형식이 올바르지 않습니다.")
                 
                 if attempt == self.max_retries - 1:
                     raise
@@ -280,6 +464,75 @@ class GeminiService:
         except Exception as e:
             logger.error(f"포트폴리오 이미지 분석 실패: {str(e)}")
             raise
+
+    async def analyze_multiple_portfolio_images(self, image_data_list: List[bytes]) -> str:
+        """
+        다중 포트폴리오 이미지 분석
+        
+        Args:
+            image_data_list: 이미지 바이트 데이터 리스트
+        
+        Returns:
+            str: 마크다운 형식의 분석 결과
+            
+        Raises:
+            ValueError: 이미지 검증 실패 또는 API 응답 검증 실패
+            TimeoutError: API 호출 타임아웃
+            Exception: 기타 예외
+        """
+        try:
+            # 입력 검증
+            if not image_data_list or len(image_data_list) == 0:
+                raise ValueError("분석할 이미지가 없습니다.")
+            
+            if len(image_data_list) > 5:
+                raise ValueError("최대 5개의 이미지만 분석 가능합니다.")
+            
+            # 각 이미지 검증
+            for i, image_data in enumerate(image_data_list):
+                try:
+                    await validate_image(image_data)
+                except ValueError as e:
+                    logger.error(f"이미지 {i+1} 검증 실패: {str(e)}")
+                    raise ValueError(f"이미지 {i+1} 검증 실패: {str(e)}")
+            
+            # 캐시 키 생성 (모든 이미지의 해시 조합)
+            cache_key = self._generate_multiple_cache_key(image_data_list)
+            if cache_key in self._cache:
+                logger.info("다중 이미지 분석 결과 캐시에서 반환")
+                return self._cache[cache_key]
+            
+            # 다중 이미지 API 호출
+            try:
+                result = await self._call_gemini_api_multiple(image_data_list)
+            except TimeoutError as e:
+                logger.error(f"다중 이미지 분석 타임아웃: {str(e)}")
+                raise TimeoutError(f"다중 이미지 분석 시간이 초과되었습니다. 이미지 수를 줄이거나 잠시 후 다시 시도해 주세요.")
+            except ValueError as e:
+                logger.error(f"다중 이미지 분석 값 오류: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"다중 이미지 API 호출 실패: {str(e)}")
+                raise ValueError(f"AI 분석 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.")
+            
+            # 결과 검증 및 캐싱
+            try:
+                validated_result = self._validate_markdown_response(result)
+            except ValueError as e:
+                logger.error(f"다중 이미지 분석 결과 검증 실패: {str(e)}")
+                raise ValueError(f"분석 결과 형식이 올바르지 않습니다. 다시 시도해 주세요.")
+            
+            self._cache[cache_key] = validated_result
+            
+            logger.info(f"다중 이미지 분석 완료 ({len(image_data_list)}개 이미지)")
+            return validated_result
+            
+        except (ValueError, TimeoutError):
+            # 이미 처리된 예외는 그대로 전파
+            raise
+        except Exception as e:
+            logger.error(f"다중 이미지 분석 예상치 못한 오류: {str(e)}", exc_info=True)
+            raise ValueError(f"분석 중 예상치 못한 오류가 발생했습니다. 다시 시도해 주세요.")
 
     async def get_sample_analysis(self) -> str:
         """샘플 분석 결과 반환 (테스트용) - 마크다운 텍스트"""

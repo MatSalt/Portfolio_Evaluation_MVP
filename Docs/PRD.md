@@ -6,15 +6,15 @@
 
   * **제품명:** 포트폴리오 스코어 (Portfolio Score) - 추출 기능 MVP
   * **버전:** 0.1
-  * **목표:** 사용자가 포트폴리오 화면 캡처를 업로드하면, AI Vision 모델로 보유 종목 데이터를 추출하고 이를 기반으로 **AI 총평, 포트폴리오 종합 리니아 스코어, 3대 핵심 기준 스코어, 종목별 상세 분석 카드**를 생성·제공한다. (사용자 편집 플로우 제외)
+  * **목표:** 사용자가 포트폴리오 화면 캡처(단일 또는 다중)를 업로드하면, AI Vision 모델로 보유 종목 데이터를 추출하고 이를 기반으로 **AI 총평, 포트폴리오 종합 리니아 스코어, 3대 핵심 기준 스코어, 종목별 상세 분석 카드**를 생성·제공한다. (사용자 편집 플로우 제외)
 
 -----
 
 ### \#\# 1. 사용자 플로우 (User Flow)
 
 1.  **[진입]** 메인 페이지 진입 → 업로드 영역 표시.
-2.  **[업로드]** 스크린샷 업로드(버튼/드래그 앤 드롭).
-3.  **[처리]** 프론트엔드가 이미지를 백엔드 `/api/analyze`로 전송, 로딩 인디케이터 표시.
+2.  **[업로드]** 스크린샷 업로드(버튼/드래그 앤 드롭, 최대 5개 이미지 지원).
+3.  **[처리]** 프론트엔드가 이미지(단일/다중)를 백엔드 `/api/analyze`로 전송, 로딩 인디케이터 표시.
 4.  **[AI 분석 출력]** 백엔드 분석 완료 후, **AI 총평/종합 스코어/3대 기준 스코어/종목별 분석 카드**를 **마크다운 텍스트**로 화면에 표시.
 
 ### \#\# 2. 핵심 기능 명세 (Core Feature Specifications)
@@ -36,13 +36,13 @@
 
           * **기능:** 이미지 파일을 입력받고 상태를 관리한다.
           * **요구사항:**
-              * `<input type="file" accept="image/png, image/jpeg" />`를 포함해야 한다.
-              * 드래그 앤 드롭 기능을 지원해야 한다.
-              * 파일이 선택되면 이미지 썸네일을 미리 보여줘야 한다.
+              * `<input type="file" accept="image/png, image/jpeg" multiple />`를 포함해야 한다.
+              * 드래그 앤 드롭 기능을 지원해야 한다 (다중 파일 지원).
+              * 파일이 선택되면 이미지 썸네일을 미리 보여줘야 한다 (최대 5개).
               * 상태 관리: `idle`, `loading`, `success`, `error` 4가지 상태를 가져야 한다.
           * **API 호출:**
               * '분석하기' 버튼 클릭 시 `loading` 상태로 변경.
-              * 백엔드의 `/api/analyze` 엔드포인트로 `multipart/form-data` 형식의 `POST` 요청을 보낸다.
+              * 단일/다중 이미지 모두 백엔드의 `/api/analyze` 엔드포인트로 `multipart/form-data` 형식의 `POST` 요청을 보낸다.
 
       * **`AnalysisDisplay.tsx`**
 
@@ -59,19 +59,20 @@
       * GitHub 저장소: https://github.com/fastapi/fastapi
 
   * **엔드포인트 명세:**
-      * **`POST /api/analyze`**
+      * **`POST /api/analyze`** (단일/다중 이미지 통합)
           * **요청 (Request):**
               * **Content-Type:** `multipart/form-data`
-              * **Body:** `file` (이미지 파일)
+              * **Body:** `files` (이미지 파일 배열, 1-5개)
           * **처리 로직 (Processing Logic):**
-            1.  요청으로부터 이미지 파일(`UploadFile`)을 받는다.
-            2.  이미지 파일을 메모리에서 읽어 **Base64**로 인코딩한다.
-            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지를 포함하여 요청을 구성한다.
+            1.  요청으로부터 이미지 파일 배열(`List[UploadFile]`)을 받는다.
+            2.  이미지 파일들을 메모리에서 읽어 **Base64**로 인코딩한다.
+            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지들을 포함하여 요청을 구성한다.
             4.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
             5.  LLM이 반환한 **마크다운 형식의 텍스트 응답**을 그대로 받는다.
             6.  성공 시, 상태 코드 `200 OK`와 함께 **마크다운 텍스트**를 반환한다.
           * **에러 핸들링 (Error Handling):**
               * 이미지 파일이 아닐 경우: `400 Bad Request`
+              * 파일 개수가 1-5개 범위를 벗어날 경우: `400 Bad Request`
               * LLM API 호출 실패 시: `503 Service Unavailable`
               * LLM 응답 형식 오류 시: `500 Internal Server Error`
           * **응답 (Response):** 아래 **3. 데이터 요구사항** 참조
@@ -113,7 +114,7 @@ response = client.models.generate_content(
 - Live API 도구 사용: https://ai.google.dev/gemini-api/docs/live-tools?hl=ko
 
 ```text
-당신은 포트폴리오 분석 전문가입니다. 제공된 증권사 앱 스크린샷에서 보유 종목을 추출하고 종합적인 투자 분석을 수행하세요.
+당신은 포트폴리오 분석 전문가입니다. 제공된 증권사 앱 스크린샷(단일 또는 다중)에서 보유 종목을 추출하고 종합적인 투자 분석을 수행하세요.
 
 다음 마크다운 형식으로 정확히 출력하세요 (추가 텍스트 없이):
 
@@ -194,7 +195,8 @@ response = client.models.generate_content(
     {
       "content": "**AI 총평:** 문영님의 포트폴리오는 '양자 컴퓨팅 및 AI 기술 혁신 추구형' 전략을 명확히 따르고 있으며, 잠재력은 높으나 기술주의 높은 변동성과 신흥 기술 리스크에 다소 취약합니다.\n\n**포트폴리오 종합 리니아 스코어: 72 / 100**\n\n**3대 핵심 기준 스코어:**\n\n- **성장 잠재력:** 88 / 100\n- **안정성 및 방어력:** 55 / 100\n- **전략적 일관성:** 74 / 100\n\n... (expected_result.md와 동일한 마크다운 형식의 전체 분석 결과)",
       "processing_time": 15.2,
-      "request_id": "uuid-string"
+      "request_id": "uuid-string",
+      "images_processed": 3
     }
     ```
 
@@ -243,6 +245,7 @@ response = client.models.generate_content(
   * Gemini API 키는 환경 변수로 관리하고 서버 사이드에서만 사용한다.
   * Google Gen AI SDK의 안전 설정을 적용하여 부적절한 콘텐츠 생성을 방지한다.
   * 파일 크기 제한(예: 10MB)과 허용 확장자(PNG, JPEG) 검증을 수행한다.
+  * 다중 이미지 업로드 시 최대 5개 파일 제한을 적용한다.
 
 -----
 
@@ -250,6 +253,7 @@ response = client.models.generate_content(
 
   * Google Gen AI Python SDK를 통한 Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
   * **Google Search 최적화**: 검색 쿼리를 효율적으로 구성하여 관련성 높은 정보만 검색하고 응답 시간을 단축한다.
+  * **다중 이미지 처리 최적화**: 단일 API 요청으로 여러 이미지를 처리하여 효율성을 극대화한다.
   * 동일 이미지 반복 분석에 대한 캐싱 전략(해시 기반 중복 방지)을 적용한다.
   * 비동기 I/O로 업로드/LLM 호출/Google Search 파이프라인을 병렬화한다.
   * **검색 결과 캐싱**: 동일한 검색 쿼리에 대해 일정 시간 동안 캐시된 결과를 활용하여 API 호출 비용을 절약한다.

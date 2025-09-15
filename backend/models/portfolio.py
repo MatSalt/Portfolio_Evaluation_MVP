@@ -28,6 +28,7 @@ class AnalysisResponse(BaseModel):
     content: str = Field(..., description="expected_result.md와 동일한 형식의 마크다운 텍스트")
     processing_time: float = Field(..., description="처리 시간 (초)")
     request_id: str = Field(..., description="요청 ID")
+    images_processed: int = Field(default=1, description="처리된 이미지 수")
     
     @field_validator('content')
     @classmethod

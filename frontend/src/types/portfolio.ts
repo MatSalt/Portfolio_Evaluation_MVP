@@ -19,6 +19,7 @@ export interface AnalysisResponse {
   content: string;          // 마크다운 형식의 분석 결과
   processing_time: number;  // 처리 시간 (초)
   request_id: string;       // 요청 ID
+  images_processed?: number; // 처리된 이미지 수 (옵셔널, 하위 호환성)
 }
 
 /**
@@ -35,8 +36,8 @@ export interface ApiError {
  */
 export interface UploadState {
   status: UploadStatus;
-  file: File | null;
-  preview: string | null;
+  files: File[];        // File[] 배열로 변경
+  previews: string[];   // string[] 배열로 변경
   error: string | null;
 }
 
@@ -67,3 +68,8 @@ export type SupportedImageType = typeof SUPPORTED_IMAGE_TYPES[number];
  * 파일 크기 제한 (10MB)
  */
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
+/**
+ * 다중 파일 상수
+ */
+export const MAX_FILES = 5; // 최대 파일 수
