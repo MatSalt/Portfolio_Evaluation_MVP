@@ -26,14 +26,25 @@ app = FastAPI(
 )
 
 # CORS 설정
+# 원래 설정 (프로덕션용)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         os.getenv("FRONTEND_URL", "http://localhost:3000"),
+#         "http://localhost:3000",
+#         "https://portfolio-evaluation-mvp.vercel.app"  # 배포용
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+#     allow_headers=["*"],
+#     expose_headers=["*"]
+# )
+
+# 임시 설정 (모든 도메인 허용 - 배포 테스트용)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        os.getenv("FRONTEND_URL", "http://localhost:3000"),
-        "http://localhost:3000",
-        "https://portfolio-evaluation-mvp.vercel.app"  # 배포용
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # 모든 도메인 허용
+    allow_credentials=False,  # credentials는 false로 설정
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"]
