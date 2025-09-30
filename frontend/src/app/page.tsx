@@ -202,26 +202,41 @@ export default function Home() {
             </section>
           )}
 
-          {/* 분석 결과 영역 */}
-          {analysisResult && (
+          {/* 분석 결과/로딩 영역 */}
+          {(analysisState.status === 'loading' || analysisResult) && (
             <section>
-              {isStructuredResponse(analysisResult) ? (
-                <TabbedAnalysisDisplay data={analysisResult} />
-              ) : (
+              {analysisState.status === 'loading' && (
                 <Suspense fallback={
                   <div className="flex justify-center items-center p-8">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
                 }>
                   <AnalysisDisplay 
-                    analysisState={{
-                      status: 'success',
-                      data: analysisResult,
-                      error: null,
-                    }}
+                    analysisState={analysisState}
                     onRetry={handleAnalyzeClick}
                   />
                 </Suspense>
+              )}
+
+              {analysisState.status !== 'loading' && analysisResult && (
+                isStructuredResponse(analysisResult) ? (
+                  <TabbedAnalysisDisplay data={analysisResult} />
+                ) : (
+                  <Suspense fallback={
+                    <div className="flex justify-center items-center p-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  }>
+                    <AnalysisDisplay 
+                      analysisState={{
+                        status: 'success',
+                        data: analysisResult,
+                        error: null,
+                      }}
+                      onRetry={handleAnalyzeClick}
+                    />
+                  </Suspense>
+                )
               )}
 
               {/* 다시 분석하기 버튼 */}
