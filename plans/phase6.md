@@ -1266,6 +1266,310 @@ def test_invalid_score_validation():
 
 ---
 
+## ⚠️ 알려진 이슈 및 해결 방법
+
+### 이슈: Gemini API "additionalProperties is not supported" 에러
+
+**증상:**
+```
+POST /api/analyze?format=json → 400 Bad Request
+ERROR: additionalProperties is not supported in the Gemini API.
+```
+
+**원인:**
+Gemini Structured Output API는 다음과 같은 Pydantic 스키마 패턴을 지원하지 않습니다:
+1. **동적 키를 가진 Dict**: `Dict[str, Union[str, int]]` (행 데이터의 키가 런타임에 결정됨)
+2. **Union 타입에 dict 포함**: `Union[DashboardContent, ..., dict]` (Tab.content)
+3. **additionalProperties 허용**: JSON Schema에서 임의의 추가 필드를 허용하는 패턴
+
+현재 `PortfolioReport` 모델의 문제점:
+- `Tab.content`가 `Union[..., dict]`로 정의되어 동적 타입 허용
+- `ScoreTable.rows`가 `List[Dict[str, Union[str, int]]]`로 컬럼명이 가변적
+- 이러한 패턴들이 Gemini의 엄격한 스키마 검증을 통과하지 못함
+
+**해결 방법 (단기 핫픽스):**
+
+Gemini에게 `response_schema`를 직접 전달하지 않고, JSON 형식으로만 응답을 요청한 뒤 서버에서 Pydantic 검증을 수행합니다.
+
+#### Step 1: Gemini 서비스 수정
+
+**파일**: `backend/services/gemini_service.py`
+
+```python
+async def _call_gemini_structured(
+    self, 
+    image_data_list: List[bytes]
+) -> PortfolioReport:
+    """
+    Gemini API 구조화된 출력 호출 (JSON 모드)
+    
+    주의: response_schema를 직접 전달하지 않고, JSON 형식으로만 요청
+    """
+    for attempt in range(self.max_retries):
+        try:
+            logger.info(f"Gemini API 구조화된 출력 호출 시도 {attempt + 1}/{self.max_retries}")
+            
+            # 1. contents 배열 구성
+            contents = []
+            
+            # 이미지 파트 추가
+            for i, image_data in enumerate(image_data_list):
+                image_part = Part.from_bytes(
+                    data=image_data,
+                    mime_type='image/jpeg'
+                )
+                contents.append(image_part)
+                logger.debug(f"이미지 {i+1}/{len(image_data_list)} 추가")
+            
+            # 프롬프트 추가 (JSON 스키마를 텍스트로 명시)
+            prompt = self._get_structured_prompt()
+            contents.append(prompt)
+            
+            # 2. Google Search 도구 설정
+            from google.genai import types
+            grounding_tool = types.Tool(
+                google_search=types.GoogleSearch()
+            )
+            
+            # 3. JSON 출력 설정 (response_schema 제거)
+            config = GenerateContentConfig(
+                temperature=0.1,  # 일관된 구조를 위해 낮은 온도
+                max_output_tokens=8192,
+                response_mime_type="application/json",  # JSON 출력만 지정
+                # response_schema=PortfolioReport,  # ← 제거! (additionalProperties 문제)
+                tools=[grounding_tool]
+            )
+            
+            # 4. API 호출
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config
+            )
+            
+            # 5. JSON 응답 파싱 및 Pydantic 검증
+            if response and response.text:
+                logger.info("Gemini API JSON 응답 수신")
+                
+                # JSON 텍스트를 Pydantic 모델로 검증
+                try:
+                    portfolio_report = PortfolioReport.model_validate_json(response.text)
+                    logger.info("PortfolioReport 검증 성공")
+                    return portfolio_report
+                except Exception as validation_error:
+                    logger.error(f"Pydantic 검증 실패: {str(validation_error)}")
+                    logger.debug(f"응답 텍스트: {response.text[:500]}...")
+                    raise ValueError(f"Gemini 응답이 스키마와 일치하지 않습니다: {str(validation_error)}")
+            else:
+                raise ValueError("Gemini API에서 JSON 응답을 받지 못함")
+                
+        except Exception as e:
+            logger.error(f"구조화된 출력 호출 실패 (시도 {attempt + 1}): {str(e)}")
+            if attempt == self.max_retries - 1:
+                raise
+            await asyncio.sleep(2 ** attempt)
+```
+
+#### Step 2: 프롬프트 개선 (JSON 스키마 명시)
+
+**파일**: `backend/services/gemini_service.py`
+
+```python
+def _get_structured_prompt(self) -> str:
+    """구조화된 JSON 출력용 프롬프트 (스키마 명시)"""
+    return """
+당신은 전문 포트폴리오 분석가입니다. 제공된 포트폴리오 이미지를 분석하여 다음 JSON 스키마에 **정확히** 맞는 데이터를 생성하세요.
+
+**중요**: 응답은 반드시 유효한 JSON 형식이어야 하며, 아래 스키마를 엄격히 따라야 합니다.
+
+**JSON 스키마:**
+
+```json
+{
+  "version": "1.0",
+  "reportDate": "YYYY-MM-DD",
+  "tabs": [
+    {
+      "tabId": "dashboard",
+      "tabTitle": "총괄 요약",
+      "content": {
+        "overallScore": {
+          "title": "포트폴리오 종합 스코어",
+          "score": 0-100 사이 정수,
+          "maxScore": 100
+        },
+        "coreCriteriaScores": [
+          {"criterion": "성장 잠재력", "score": 0-100, "maxScore": 100},
+          {"criterion": "안정성 및 방어력", "score": 0-100, "maxScore": 100},
+          {"criterion": "전략적 일관성", "score": 0-100, "maxScore": 100}
+        ],
+        "strengths": ["강점1", "강점2", ...],
+        "weaknesses": ["약점1", "약점2", ...]
+      }
+    },
+    {
+      "tabId": "deepDive",
+      "tabTitle": "포트폴리오 심층 분석",
+      "content": {
+        "inDepthAnalysis": [
+          {
+            "title": "성장 잠재력",
+            "score": 0-100,
+            "description": "최소 50자 이상의 상세 분석"
+          },
+          {
+            "title": "안정성 및 방어력",
+            "score": 0-100,
+            "description": "최소 50자 이상의 상세 분석"
+          },
+          {
+            "title": "전략적 일관성",
+            "score": 0-100,
+            "description": "최소 50자 이상의 상세 분석"
+          }
+        ],
+        "opportunities": {
+          "title": "기회 및 개선 방안",
+          "items": [
+            {
+              "summary": "기회 요약",
+              "details": "최소 30자 이상의 상세 설명 (What-if 시나리오 포함)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tabId": "allStockScores",
+      "tabTitle": "개별 종목 스코어",
+      "content": {
+        "scoreTable": {
+          "headers": ["주식", "Overall", "펀더멘탈", "기술 잠재력", "거시경제", "시장심리", "CEO/리더십"],
+          "rows": [
+            {
+              "주식": "종목명",
+              "Overall": 0-100,
+              "펀더멘탈": 0-100,
+              "기술 잠재력": 0-100,
+              "거시경제": 0-100,
+              "시장심리": 0-100,
+              "CEO/리더십": 0-100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tabId": "keyStockAnalysis",
+      "tabTitle": "핵심 종목 상세 분석",
+      "content": {
+        "analysisCards": [
+          {
+            "stockName": "종목명",
+            "overallScore": 0-100,
+            "detailedScores": [
+              {"category": "펀더멘탈", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "기술 잠재력", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "거시경제", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "시장심리", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "CEO/리더십", "score": 0-100, "analysis": "최소 30자 분석"}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**필수 요구사항:**
+1. 모든 점수는 0-100 사이의 정수
+2. tabs 배열은 정확히 4개 (dashboard, deepDive, allStockScores, keyStockAnalysis)
+3. reportDate는 오늘 날짜 (YYYY-MM-DD 형식)
+4. description, analysis, details 필드는 구체적이고 전문적으로 작성
+5. Google Search를 활용하여 최신 정보 반영
+6. 모든 텍스트는 한국어로 작성
+7. **JSON 형식을 정확히 지켜서 출력** (추가 텍스트 없이 순수 JSON만)
+
+이미지를 분석하여 위 스키마에 맞는 JSON을 생성하세요.
+"""
+```
+
+#### Step 3: 에러 처리 개선
+
+**파일**: `backend/services/gemini_service.py`
+
+`analyze_portfolio_structured` 메서드의 예외 처리 부분:
+
+```python
+async def analyze_portfolio_structured(
+    self,
+    image_data_list: List[bytes],
+    format_type: str = "json"
+) -> Union[StructuredAnalysisResponse, AnalysisResponse]:
+    """포트폴리오 분석 - format에 따라 JSON 또는 마크다운 반환"""
+    start_time = time.time()
+    request_id = str(uuid.uuid4())
+    
+    try:
+        # ... 입력 검증 ...
+        
+        if format_type == "json":
+            # 구조화된 JSON 출력
+            try:
+                portfolio_report = await self._call_gemini_structured(image_data_list)
+            except ValueError as ve:
+                # Pydantic 검증 실패 또는 스키마 불일치
+                logger.error(f"JSON 스키마 검증 실패: {str(ve)}")
+                raise ValueError(f"AI 응답이 예상 형식과 다릅니다. 다시 시도해 주세요.")
+            
+            return StructuredAnalysisResponse(
+                portfolioReport=portfolio_report,
+                processing_time=time.time() - start_time,
+                request_id=request_id,
+                images_processed=len(image_data_list)
+            )
+        
+        else:
+            # 기존 마크다운 출력
+            # ... (변경 없음)
+            
+    except Exception as e:
+        logger.error(f"포트폴리오 분석 실패: {str(e)}")
+        raise
+```
+
+#### Step 4: 테스트 및 검증
+
+1. **백엔드 테스트 실행:**
+```bash
+cd backend
+./venv/bin/pytest tests/test_structured_output.py -v
+```
+
+2. **수동 테스트:**
+```bash
+# 프론트엔드에서 format=json으로 이미지 업로드 테스트
+# 또는 curl로 직접 테스트:
+curl -X POST http://localhost:8000/api/analyze?format=json \
+  -F "file=@test_portfolio.png"
+```
+
+3. **검증 포인트:**
+   - [ ] 400 에러가 사라지고 200 응답 반환
+   - [ ] 응답 JSON이 4개 탭 포함
+   - [ ] 각 탭의 content 구조가 올바름
+   - [ ] Pydantic 검증이 정상 작동 (잘못된 JSON이면 ValueError)
+
+#### 주의사항
+
+1. **프롬프트 품질이 중요**: `response_schema`가 없으므로 프롬프트에 JSON 스키마를 명확히 명시해야 함
+2. **재시도 로직 유지**: Gemini가 가끔 잘못된 형식을 반환할 수 있으므로 최대 3회 재시도
+3. **응답 검증 강화**: `model_validate_json`이 실패하면 적절한 에러 메시지와 함께 400 반환
+4. **로깅 강화**: 검증 실패 시 응답 텍스트 일부를 로깅하여 디버깅 용이
+
+---
+
 ## 🚨 주의사항 및 체크리스트
 
 ### 반드시 확인할 사항

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { UploadState, AnalysisState, MAX_FILES } from '@/types/portfolio';
+import { UploadState, AnalysisState, MAX_FILES, AnalysisResult } from '@/types/portfolio';
 import { analyzePortfolio, validateImageFile, fileToBase64 } from '@/utils/api';
 
 /**
@@ -23,6 +23,12 @@ export function usePortfolioAnalysis() {
     data: null,
     error: null,
   });
+
+  // 구조화된/마크다운 포맷 선택 상태 (기본: json)
+  const [format, setFormat] = useState<'json' | 'markdown'>('json');
+
+  // 실제 응답 객체 저장 (구조화/마크다운 공용)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   /**
    * 파일 선택/드롭 처리 (다중 파일 지원)
@@ -130,8 +136,9 @@ export function usePortfolioAnalysis() {
     });
 
     try {
-      // 다중 파일 분석 API 호출
-      const result = await analyzePortfolio(uploadState.files);
+      // 다중 파일 분석 API 호출 (format 전달)
+      const result = await analyzePortfolio(uploadState.files, format);
+      setAnalysisResult(result);
       setAnalysisState({
         status: 'success',
         data: result,
@@ -144,7 +151,7 @@ export function usePortfolioAnalysis() {
         error: error.message || '분석 중 오류가 발생했습니다.',
       });
     }
-  }, [uploadState.files]);
+  }, [uploadState.files, format]);
 
   /**
    * 상태 초기화
@@ -161,6 +168,7 @@ export function usePortfolioAnalysis() {
       data: null,
       error: null,
     });
+    setAnalysisResult(null);
   }, []);
 
   /**
@@ -203,5 +211,9 @@ export function usePortfolioAnalysis() {
     removeFile,
     isLoading: analysisState.status === 'loading',
     canAnalyze: uploadState.status === 'success' && uploadState.files.length > 0,
+    // Phase 6 추가 반환값
+    analysisResult,
+    format,
+    setFormat,
   };
 }

@@ -1,5 +1,5 @@
 // src/utils/api.ts
-import { AnalysisResponse, ApiError } from '@/types/portfolio';
+import { AnalysisResponse, StructuredAnalysisResponse, ApiError, AnalysisResult } from '@/types/portfolio';
 
 /**
  * API 기본 설정
@@ -24,9 +24,13 @@ export class ApiException extends Error {
 /**
  * 포트폴리오 이미지를 분석하는 API 함수 (다중 파일 지원)
  * @param files - 분석할 이미지 파일들
- * @returns Promise<AnalysisResponse> - 분석 결과
+ * @param format - 'json' | 'markdown' (기본값: 'markdown')
+ * @returns Promise<AnalysisResult> - 분석 결과 (JSON 탭 UI 또는 마크다운)
  */
-export async function analyzePortfolio(files: File[]): Promise<AnalysisResponse> {
+export async function analyzePortfolio(
+  files: File[],
+  format: 'json' | 'markdown' = 'markdown'
+): Promise<AnalysisResult> {
   // 파일 배열 검증
   if (!files || files.length === 0) {
     throw new ApiException('분석할 파일이 없습니다.', 400);
@@ -47,7 +51,7 @@ export async function analyzePortfolio(files: File[]): Promise<AnalysisResponse>
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 300000); // 5분으로 증가
 
-    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+    const response = await fetch(`${API_BASE_URL}/api/analyze?format=${format}`, {
       method: 'POST',
       body: formData,
       signal: controller.signal,
@@ -70,11 +74,19 @@ export async function analyzePortfolio(files: File[]): Promise<AnalysisResponse>
     }
 
     // 성공 응답 파싱
-    const data: AnalysisResponse = await response.json();
+    const data: AnalysisResult = await response.json();
     
-    // 응답 데이터 유효성 검사
-    if (!data.content || typeof data.content !== 'string') {
-      throw new ApiException('잘못된 응답 형식', 500);
+    // 응답 데이터 유효성 검사 (format별 분기)
+    if (format === 'json') {
+      const structured = data as StructuredAnalysisResponse;
+      if (!structured || !structured.portfolioReport || !structured.portfolioReport.tabs) {
+        throw new ApiException('잘못된 응답 형식', 500);
+      }
+    } else {
+      const markdown = data as AnalysisResponse;
+      if (!markdown.content || typeof markdown.content !== 'string') {
+        throw new ApiException('잘못된 응답 형식', 500);
+      }
     }
 
     return data;

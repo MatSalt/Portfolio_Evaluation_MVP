@@ -8,13 +8,13 @@
 import time
 import uuid
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
+from typing import Optional, List, Union
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 
 from models.portfolio import (
     AnalysisResponse, AnalysisRequest, 
-    ErrorResponse
+    ErrorResponse, StructuredAnalysisResponse
 )
 from services.gemini_service import get_gemini_service, GeminiService
 from utils.image_utils import validate_image, is_supported_image_type, get_image_info
@@ -27,12 +27,30 @@ router = APIRouter()
 
 @router.post(
     "/analyze",
-    response_model=AnalysisResponse,
+    response_model=Union[AnalysisResponse, StructuredAnalysisResponse],
+    responses={
+        200: {"description": "분석 성공"},
+        400: {"model": ErrorResponse, "description": "잘못된 요청"},
+        500: {"model": ErrorResponse, "description": "서버 오류"},
+        503: {"model": ErrorResponse, "description": "서비스 사용 불가"},
+    },
     summary="포트폴리오 이미지 분석",
-    description="업로드된 포트폴리오 스크린샷을 분석하여 expected_result.md와 동일한 형식의 마크다운 텍스트 리포트를 생성합니다."
+    description="업로드된 포트폴리오 스크린샷을 분석하여 마크다운 또는 4개 탭 구조의 JSON을 반환합니다. 기본값은 마크다운입니다."
 )
 async def analyze_portfolio(
-    files: List[UploadFile] = File(..., description="포트폴리오 스크린샷 파일들 (1-5개)"),
+    files: Optional[List[UploadFile]] = File(
+        default=None,
+        description="포트폴리오 스크린샷 파일들 (1-5개), 필드명: files"
+    ),
+    file: Optional[UploadFile] = File(
+        default=None,
+        description="단일 파일 업로드 하위호환 필드명: file"
+    ),
+    format: str = Query(
+        default="markdown",
+        description="출력 형식: 'json' (구조화된 출력) 또는 'markdown' (기존 방식)",
+        regex="^(json|markdown)$"
+    ),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     gemini_service: GeminiService = Depends(get_gemini_service)
 ):
@@ -41,26 +59,36 @@ async def analyze_portfolio(
     
     Args:
         files: 업로드된 이미지 파일들 (1-5개)
+        format: 출력 형식 ('json' | 'markdown')
         background_tasks: 백그라운드 작업
         gemini_service: Gemini 서비스 인스턴스
     
     Returns:
-        AnalysisResponse: 마크다운 텍스트 분석 결과
+        AnalysisResponse | StructuredAnalysisResponse
     """
     request_id = str(uuid.uuid4())
     start_time = time.time()
     
     try:
-        logger.info(f"포트폴리오 분석 요청 시작 (ID: {request_id}, 파일 수: {len(files)})")
+        # 하위호환: 단일 파일 필드 지원(file -> files 승격)
+        incoming_files: List[UploadFile] = []
+        if files:
+            incoming_files = list(files)
+        elif file is not None:
+            incoming_files = [file]
+
+        logger.info(
+            f"포트폴리오 분석 요청 시작 (ID: {request_id}, 파일 수: {len(incoming_files)}, format: {format})"
+        )
         
         # 1. 파일 개수 검증
-        if not files or len(files) == 0:
+        if not incoming_files or len(incoming_files) == 0:
             raise HTTPException(
-                status_code=400,
+                status_code=422,
                 detail="최소 1개의 파일이 필요합니다."
             )
         
-        if len(files) > 5:
+        if len(incoming_files) > 5:
             raise HTTPException(
                 status_code=400,
                 detail="최대 5개의 파일만 업로드 가능합니다."
@@ -68,7 +96,7 @@ async def analyze_portfolio(
         
         # 2. 파일 유효성 검사 및 데이터 읽기
         image_data_list = []
-        for i, file in enumerate(files):
+        for i, file in enumerate(incoming_files):
             if not file.filename:
                 raise HTTPException(
                     status_code=400,
@@ -105,16 +133,13 @@ async def analyze_portfolio(
             
             image_data_list.append(image_data)
         
-        # 3. Gemini API를 통한 분석
+        # 3. Gemini API를 통한 분석 (format에 따라 구조화/마크다운 통합 처리)
         try:
-            logger.info(f"Gemini 분석 시작 (ID: {request_id}, 이미지 수: {len(image_data_list)})")
-            
-            # 단일 이미지면 기존 메서드, 다중 이미지면 새 메서드 사용
-            if len(image_data_list) == 1:
-                markdown_content = await gemini_service.analyze_portfolio_image(image_data_list[0])
-            else:
-                markdown_content = await gemini_service.analyze_multiple_portfolio_images(image_data_list)
-            
+            logger.info(f"Gemini 분석 시작 (ID: {request_id}, 이미지 수: {len(image_data_list)}, format: {format})")
+            result = await gemini_service.analyze_portfolio_structured(
+                image_data_list=image_data_list,
+                format_type=format
+            )
             logger.info(f"Gemini 분석 완료 (ID: {request_id})")
             
         except TimeoutError as e:
@@ -142,28 +167,29 @@ async def analyze_portfolio(
                 detail="AI 분석 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요."
             )
         
-        # 4. 응답 생성
+        # 4. 응답 생성 및 백그라운드 로깅
         processing_time = time.time() - start_time
         
-        response = AnalysisResponse(
-            content=markdown_content,
-            processing_time=processing_time,
-            request_id=request_id,
-            images_processed=len(image_data_list)  # 처리된 이미지 수 추가
-        )
+        # result는 AnalysisResponse 또는 StructuredAnalysisResponse
+        if isinstance(result, AnalysisResponse):
+            response = result
+            content_length = len(result.content)
+        else:
+            response = result
+            content_length = 0
         
-        # 5. 백그라운드 로깅
+        # 백그라운드 로깅
         total_file_size = sum(len(data) for data in image_data_list)
         background_tasks.add_task(
             log_analysis_success,
             request_id=request_id,
-            filename=f"{len(files)}개 파일",
+            filename=f"{len(incoming_files)}개 파일",
             file_size=total_file_size,
             processing_time=processing_time,
-            content_length=len(markdown_content)
+            content_length=content_length
         )
         
-        logger.info(f"포트폴리오 분석 완료 (ID: {request_id}, {processing_time:.2f}초)")
+        logger.info(f"포트폴리오 분석 완료 (ID: {request_id}, {processing_time:.2f}초, format: {format})")
         return response
         
     except HTTPException:

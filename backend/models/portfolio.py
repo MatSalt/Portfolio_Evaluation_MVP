@@ -5,10 +5,11 @@
 마크다운 텍스트 출력 방식에 최적화된 간단한 구조를 제공합니다.
 """
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, List, Dict, Union, Any
 from enum import Enum
 import time
+from datetime import datetime
 
 class AnalysisStatus(str, Enum):
     """분석 상태"""
@@ -104,3 +105,189 @@ SAMPLE_MARKDOWN_CONTENT = """**AI 총평:** 샘플 포트폴리오는 **'기술 
 - **거시경제 (75/100):** 글로벌 디지털 전환 가속화의 직접적인 수혜
 - **시장심리 (85/100):** 기술 혁신에 대한 시장의 높은 기대감
 - **CEO/리더십 (85/100):** 비전 있는 리더십과 혁신적인 경영 전략"""
+
+# ============================================
+# 구조화된 출력 모델 (Phase 6 추가)
+# ============================================
+
+
+class ScoreData(BaseModel):
+    """점수 데이터 기본 모델"""
+    title: str = Field(..., description="점수 항목 제목")
+    score: int = Field(..., ge=0, le=100, description="0-100 사이 점수")
+    maxScore: int = Field(default=100, description="최대 점수")
+
+
+class CoreCriteriaScore(BaseModel):
+    """핵심 기준 점수"""
+    criterion: str = Field(
+        ..., description="기준명: 성장 잠재력, 안정성 및 방어력, 전략적 일관성"
+    )
+    score: int = Field(..., ge=0, le=100, description="0-100 사이 점수")
+    maxScore: int = Field(default=100, description="최대 점수")
+
+
+class DashboardContent(BaseModel):
+    """탭 1: 총괄 요약 컨텐츠"""
+    overallScore: ScoreData = Field(..., description="종합 점수")
+    coreCriteriaScores: List[CoreCriteriaScore] = Field(
+        ..., description="3대 핵심 기준 점수"
+    )
+    strengths: List[str] = Field(..., min_items=1, description="강점 목록")
+    weaknesses: List[str] = Field(..., min_items=1, description="약점 목록")
+
+
+class InDepthAnalysisItem(BaseModel):
+    """심층 분석 항목"""
+    title: str = Field(..., description="분석 제목")
+    score: int = Field(..., ge=0, le=100, description="해당 기준 점수")
+    description: str = Field(..., min_length=50, description="상세 분석 내용")
+
+
+class OpportunityItem(BaseModel):
+    """기회 항목"""
+    summary: str = Field(..., description="기회 요약")
+    details: str = Field(..., min_length=30, description="상세 설명 (What-if 시나리오 포함)")
+
+
+class Opportunities(BaseModel):
+    """기회 및 개선 방안"""
+    title: str = Field(default="기회 및 개선 방안", description="섹션 제목")
+    items: List[OpportunityItem] = Field(..., min_items=1, description="기회 항목 목록")
+
+
+class DeepDiveContent(BaseModel):
+    """탭 2: 포트폴리오 심층 분석 컨텐츠"""
+    inDepthAnalysis: List[InDepthAnalysisItem] = Field(
+        ..., min_items=3, max_items=3, description="3개 기준별 심층 분석"
+    )
+    opportunities: Opportunities = Field(..., description="기회 및 개선 방안")
+
+
+class ScoreTable(BaseModel):
+    """점수 테이블"""
+    headers: List[str] = Field(..., description="테이블 헤더")
+    rows: List[Dict[str, Union[str, int]]] = Field(
+        ..., description="테이블 행 데이터"
+    )
+
+    @field_validator("headers")
+    @classmethod
+    def validate_headers(cls, v):
+        required = ["주식", "Overall"]
+        if not all(h in v for h in required):
+            raise ValueError(f"필수 헤더 누락: {required}")
+        return v
+
+
+class AllStockScoresContent(BaseModel):
+    """탭 3: 개별 종목 스코어 컨텐츠"""
+    scoreTable: ScoreTable = Field(..., description="종목 스코어 테이블")
+
+
+class DetailedScore(BaseModel):
+    """상세 점수"""
+    category: str = Field(
+        ..., description="평가 기준: 펀더멘탈, 기술 잠재력, 거시경제, 시장심리, CEO/리더십"
+    )
+    score: int = Field(..., ge=0, le=100, description="0-100 사이 점수")
+    analysis: str = Field(..., min_length=30, description="상세 분석")
+
+
+class AnalysisCard(BaseModel):
+    """종목 분석 카드"""
+    stockName: str = Field(..., description="종목명")
+    overallScore: int = Field(..., ge=0, le=100, description="종합 점수")
+    detailedScores: List[DetailedScore] = Field(
+        ..., min_items=5, max_items=5, description="5개 기준별 점수"
+    )
+
+
+class KeyStockAnalysisContent(BaseModel):
+    """탭 4: 핵심 종목 상세 분석 컨텐츠"""
+    analysisCards: List[AnalysisCard] = Field(
+        ..., min_items=1, description="핵심 종목 분석 카드"
+    )
+
+
+class Tab(BaseModel):
+    """탭 데이터"""
+    tabId: str = Field(
+        ..., description="탭 ID: dashboard, deepDive, allStockScores, keyStockAnalysis"
+    )
+    tabTitle: str = Field(..., description="탭 제목")
+    # dict를 임시로 허용하고, model_validator에서 올바른 서브모델로 변환
+    content: Union[
+        DashboardContent,
+        DeepDiveContent,
+        AllStockScoresContent,
+        KeyStockAnalysisContent,
+        dict,
+    ] = Field(..., description="탭 컨텐츠")
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_content_model_from_tab_id(cls, data: Any) -> Any:
+        # 데이터 전처리 단계에서 tabId에 따라 content를 올바른 모델로 변환
+        if not isinstance(data, dict):
+            return data
+
+        tab_id = data.get("tabId")
+        content = data.get("content")
+        if not (tab_id and isinstance(content, dict)):
+            return data
+
+        model_map = {
+            "dashboard": DashboardContent,
+            "deepDive": DeepDiveContent,
+            "allStockScores": AllStockScoresContent,
+            "keyStockAnalysis": KeyStockAnalysisContent,
+        }
+
+        if tab_id in model_map:
+            data["content"] = model_map[tab_id].model_validate(content)
+
+        return data
+
+    @field_validator("tabId")
+    @classmethod
+    def validate_tab_id(cls, v):
+        valid_ids = ["dashboard", "deepDive", "allStockScores", "keyStockAnalysis"]
+        if v not in valid_ids:
+            raise ValueError(f"유효하지 않은 탭 ID: {v}. 허용값: {valid_ids}")
+        return v
+
+
+class PortfolioReport(BaseModel):
+    """포트폴리오 리포트"""
+    version: str = Field(default="1.0", description="리포트 버전")
+    reportDate: str = Field(..., description="리포트 생성 날짜 (YYYY-MM-DD)")
+    tabs: List[Tab] = Field(..., min_items=4, max_items=4, description="4개 탭 데이터")
+
+    @field_validator("reportDate")
+    @classmethod
+    def validate_date(cls, v):
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError(f"잘못된 날짜 형식: {v}. YYYY-MM-DD 형식이어야 함")
+        return v
+
+    @field_validator("tabs")
+    @classmethod
+    def validate_tabs(cls, v):
+        tab_ids = [tab.tabId for tab in v]
+        required_ids = ["dashboard", "deepDive", "allStockScores", "keyStockAnalysis"]
+        if set(tab_ids) != set(required_ids):
+            raise ValueError(
+                f"필수 탭 누락. 필요: {required_ids}, 현재: {tab_ids}"
+            )
+        return v
+
+
+class StructuredAnalysisResponse(BaseModel):
+    """구조화된 분석 응답 (Phase 6)"""
+    portfolioReport: PortfolioReport = Field(..., description="포트폴리오 리포트")
+    processing_time: float = Field(..., description="처리 시간 (초)")
+    request_id: str = Field(..., description="요청 ID")
+    images_processed: int = Field(default=1, description="처리된 이미지 수")
