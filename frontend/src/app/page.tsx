@@ -5,6 +5,8 @@ import { useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { usePortfolioAnalysis } from '@/hooks/usePortfolioAnalysis';
 import { BarChart3, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import TabbedAnalysisDisplay from '@/components/TabbedAnalysisDisplay';
+import { isStructuredResponse } from '@/types/portfolio';
 
 // Dynamic imports for code splitting
 const ImageUploader = dynamic(() => import('@/components/ImageUploader'), {
@@ -29,6 +31,9 @@ export default function Home() {
   const {
     uploadState,
     analysisState,
+    analysisResult,
+    format,
+    setFormat,
     handleFileSelect,
     analyzeImage,
     reset,
@@ -130,7 +135,7 @@ export default function Home() {
 
         <div className="space-y-8">
           {/* 업로드 영역 */}
-          {analysisState.status !== 'success' && (
+          {!analysisResult && (
             <section>
               <div className="text-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -155,9 +160,35 @@ export default function Home() {
                 />
               </Suspense>
 
-              {/* 분석 버튼 */}
-              {canAnalyze && analysisState.status === 'idle' && (
-                <div className="text-center mt-6">
+              {/* 포맷 선택 및 분석 버튼 */}
+              {canAnalyze && (
+                <div className="text-center mt-6 space-y-4">
+                  {/* Format 선택 토글 */}
+                  <div className="flex justify-center">
+                    <div className="bg-gray-100 p-1 rounded-lg inline-flex">
+                      <button
+                        onClick={() => setFormat('json')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          format === 'json'
+                            ? 'bg-white text-gray-900 shadow'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        탭 뷰
+                      </button>
+                      <button
+                        onClick={() => setFormat('markdown')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          format === 'markdown'
+                            ? 'bg-white text-gray-900 shadow'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        마크다운 뷰
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     onClick={handleAnalyzeClick}
                     disabled={isLoading}
@@ -171,22 +202,45 @@ export default function Home() {
             </section>
           )}
 
-          {/* 분석 결과 영역 */}
-          {analysisState.status !== 'idle' && (
+          {/* 분석 결과/로딩 영역 */}
+          {(analysisState.status === 'loading' || analysisResult) && (
             <section>
-              <Suspense fallback={
-                <div className="flex justify-center items-center p-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
-              }>
-                <AnalysisDisplay 
-                  analysisState={analysisState}
-                  onRetry={handleAnalyzeClick}
-                />
-              </Suspense>
+              {analysisState.status === 'loading' && (
+                <Suspense fallback={
+                  <div className="flex justify-center items-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                }>
+                  <AnalysisDisplay 
+                    analysisState={analysisState}
+                    onRetry={handleAnalyzeClick}
+                  />
+                </Suspense>
+              )}
+
+              {analysisState.status !== 'loading' && analysisResult && (
+                isStructuredResponse(analysisResult) ? (
+                  <TabbedAnalysisDisplay data={analysisResult} />
+                ) : (
+                  <Suspense fallback={
+                    <div className="flex justify-center items-center p-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  }>
+                    <AnalysisDisplay 
+                      analysisState={{
+                        status: 'success',
+                        data: analysisResult,
+                        error: null,
+                      }}
+                      onRetry={handleAnalyzeClick}
+                    />
+                  </Suspense>
+                )
+              )}
 
               {/* 다시 분석하기 버튼 */}
-              {analysisState.status === 'success' && (
+              {analysisResult && (
                 <div className="text-center mt-8">
                   <button
                     onClick={handleRestart}
@@ -201,7 +255,7 @@ export default function Home() {
         </div>
 
         {/* 특징 소개 (분석 완료 전에만 표시) */}
-        {analysisState.status !== 'success' && (
+        {!analysisResult && (
           <section className="mt-16">
             <div className="text-center mb-12">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">

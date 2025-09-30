@@ -35,6 +35,26 @@
 - **공식 문서**: https://github.com/remarkjs/remark-gfm
 - **설명**: GitHub Flavored Markdown 지원을 위한 Remark 플러그인
 
+### 6. Headless UI
+- **버전**: 최신 버전
+- **공식 문서**: https://headlessui.com/
+- **설명**: 접근성을 고려한 UI 컴포넌트 라이브러리 (탭 컴포넌트)
+
+### 7. Chart.js
+- **버전**: 최신 버전
+- **공식 문서**: https://www.chartjs.org/
+- **설명**: 점수 시각화를 위한 차트 라이브러리
+
+### 8. Recharts
+- **버전**: 최신 버전
+- **공식 문서**: https://recharts.org/
+- **설명**: React용 차트 라이브러리 (Chart.js 대안)
+
+### 9. Zod
+- **버전**: 최신 버전
+- **공식 문서**: https://zod.dev/
+- **설명**: TypeScript 우선 스키마 검증 라이브러리 (프론트엔드 데이터 검증)
+
 ---
 
 ## 🔧 백엔드 (Backend)
@@ -59,6 +79,7 @@
 - **버전**: 2.11.7
 - **공식 문서**: https://docs.pydantic.dev/
 - **설명**: 데이터 검증 및 설정 관리 라이브러리
+- **구조화된 출력**: Gemini API의 `response_schema`에 사용되는 Pydantic 모델 정의
 
 ### 5. Pydantic Settings
 - **버전**: 2.10.1
@@ -114,12 +135,17 @@
 - **공식 문서**: https://googleapis.github.io/python-genai/
 - **참고 문서**: `Docs/gemini_llms.txt`
 - **설명**: Google의 최신 AI 모델, 이미지 분석 및 텍스트 생성에 사용
+- **구조화된 출력**: Pydantic 모델을 사용한 JSON 스키마 정의
+- **Google Search 통합**: Gemini API의 `google_search` 도구를 활용한 실시간 웹 검색
+- **그라운딩 기능**: 검색된 정보를 기반으로 한 정확한 분석 제공
 
 ### 2. Google Gen AI Python SDK
 - **버전**: 1.36.0
 - **공식 문서**: https://googleapis.github.io/python-genai/
 - **GitHub 저장소**: https://github.com/googleapis/python-genai
 - **설명**: Gemini API를 Python에서 사용하기 위한 공식 SDK
+- **구조화된 출력 지원**: `response_mime_type="application/json"` 및 `response_schema` 설정
+- **Google Search 도구**: `google_search` 도구를 통한 실시간 웹 검색 기능
 
 ---
 

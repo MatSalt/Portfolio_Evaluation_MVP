@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from main import app
 from models.portfolio import SAMPLE_MARKDOWN_CONTENT
+from models.portfolio import StructuredAnalysisResponse
 
 # 테스트용 환경변수 설정
 os.environ['GEMINI_API_KEY'] = 'test_api_key'
@@ -67,6 +68,120 @@ class TestAnalyzeAPI:
         files = {"file": ("test.txt", b"not_an_image", "text/plain")}
         response = client.post("/api/analyze", files=files)
         assert response.status_code == 400
+
+    @patch('utils.image_utils.validate_image')
+    @patch('services.gemini_service.GeminiService.analyze_portfolio_structured')
+    def test_analyze_portfolio_json_success(self, mock_analyze_structured, mock_validate, sample_image_file):
+        """format=json 구조화 출력 성공 테스트"""
+        mock_validate.return_value = None
+
+        # 최소 유효 구조화 응답 생성 (4개 탭 포함)
+        valid_structured = {
+            "portfolioReport": {
+                "version": "1.0",
+                "reportDate": "2025-09-30",
+                "tabs": [
+                    {
+                        "tabId": "dashboard",
+                        "tabTitle": "총괄 요약",
+                        "content": {
+                            "overallScore": {"title": "종합", "score": 70, "maxScore": 100},
+                            "coreCriteriaScores": [
+                                {"criterion": "성장 잠재력", "score": 80, "maxScore": 100},
+                                {"criterion": "안정성 및 방어력", "score": 60, "maxScore": 100},
+                                {"criterion": "전략적 일관성", "score": 70, "maxScore": 100},
+                            ],
+                            "strengths": ["강점1"],
+                            "weaknesses": ["약점1"],
+                        },
+                    },
+                    {
+                        "tabId": "deepDive",
+                        "tabTitle": "심층 분석",
+                        "content": {
+                            "inDepthAnalysis": [
+                                {"title": "성장", "score": 80, "description": "a" * 60},
+                                {"title": "안정성", "score": 60, "description": "b" * 60},
+                                {"title": "일관성", "score": 70, "description": "c" * 60},
+                            ],
+                            "opportunities": {
+                                "title": "기회 및 개선 방안",
+                                "items": [
+                                    {"summary": "요약1", "details": "d" * 40},
+                                ],
+                            },
+                        },
+                    },
+                    {
+                        "tabId": "allStockScores",
+                        "tabTitle": "종목 스코어",
+                        "content": {
+                            "scoreTable": {
+                                "headers": [
+                                    "주식", "Overall", "펀더멘탈", "기술 잠재력", "거시경제", "시장심리", "CEO/리더십"
+                                ],
+                                "rows": [
+                                    {"주식": "ABC", "Overall": 75, "펀더멘탈": 70, "기술 잠재력": 80, "거시경제": 65, "시장심리": 60, "CEO/리더십": 85}
+                                ],
+                            }
+                        },
+                    },
+                    {
+                        "tabId": "keyStockAnalysis",
+                        "tabTitle": "핵심 종목",
+                        "content": {
+                            "analysisCards": [
+                                {
+                                    "stockName": "ABC",
+                                    "overallScore": 75,
+                                    "detailedScores": [
+                                        {"category": "펀더멘탈", "score": 70, "analysis": "x" * 40},
+                                        {"category": "기술 잠재력", "score": 80, "analysis": "y" * 40},
+                                        {"category": "거시경제", "score": 65, "analysis": "z" * 40},
+                                        {"category": "시장심리", "score": 60, "analysis": "m" * 40},
+                                        {"category": "CEO/리더십", "score": 85, "analysis": "n" * 40},
+                                    ],
+                                }
+                            ]
+                        },
+                    }
+                ]
+            },
+            "processing_time": 1.23,
+            "request_id": "test-req-id",
+            "images_processed": 1
+        }
+
+        # 서비스 메서드를 직접 모킹하여 구조화 응답 반환
+        mock_analyze_structured.return_value = StructuredAnalysisResponse(**valid_structured)
+
+        response = client.post("/api/analyze?format=json", files=sample_image_file)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "portfolioReport" in data
+        assert "tabs" in data["portfolioReport"]
+        assert len(data["portfolioReport"]["tabs"]) == 4
+
+    @patch('utils.image_utils.validate_image')
+    @patch('services.gemini_service.GeminiService.analyze_portfolio_structured')
+    def test_analyze_portfolio_json_schema_error(self, mock_analyze_structured, mock_validate, sample_image_file):
+        """format=json 구조화 출력 시 스키마 불일치 -> 400"""
+        mock_validate.return_value = None
+        mock_analyze_structured.side_effect = ValueError("invalid schema")
+
+        response = client.post("/api/analyze?format=json", files=sample_image_file)
+        assert response.status_code == 400
+
+    @patch('utils.image_utils.validate_image')
+    @patch('services.gemini_service.GeminiService.analyze_portfolio_structured')
+    def test_analyze_portfolio_json_timeout(self, mock_analyze_structured, mock_validate, sample_image_file):
+        """format=json 구조화 출력 시 타임아웃 -> 503"""
+        mock_validate.return_value = None
+        mock_analyze_structured.side_effect = TimeoutError("timeout")
+
+        response = client.post("/api/analyze?format=json", files=sample_image_file)
+        assert response.status_code == 503
     
     @patch('api.analyze.get_gemini_service')
     def test_get_sample_analysis(self, mock_get_service):

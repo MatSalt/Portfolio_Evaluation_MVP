@@ -1,15 +1,16 @@
 # Portfolio Evaluation MVP - 개발 가이드라인
 
 ## 프로젝트 목표
-증권사 앱의 포트폴리오 스크린샷(단일 또는 다중)을 업로드하면 AI Vision 모델을 통해 종합적인 포트폴리오 분석을 수행하고, expected_result.md와 동일한 형식의 마크다운 텍스트로 전문적인 투자 분석 리포트를 제공하는 MVP를 개발합니다. 사용자는 AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
+증권사 앱의 포트폴리오 스크린샷(단일 또는 다중)을 업로드하면 AI Vision 모델을 통해 종합적인 포트폴리오 분석을 수행하고, **구조화된 JSON 데이터**를 생성하여 **4개 탭으로 구성된 인터랙티브 UI**에 표시하는 MVP를 개발합니다. 사용자는 AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
 
 ## 핵심 기능
 1. **이미지 업로드**: 드래그 앤 드롭 또는 파일 선택으로 포트폴리오 스크린샷 업로드 (최대 5개)
 2. **AI 분석**: Google Gemini 2.5 Flash API (google-genai Python SDK)를 사용한 종합적인 포트폴리오 분석
 3. **Google Search 통합**: 실시간 웹 검색을 통한 최신 시장 정보 및 뉴스 검색
-4. **전문 분석 리포트**: AI 총평, 리니아 스코어, 3대 핵심 기준 분석, 강점/약점/기회 분석, 개별 종목 상세 분석
-5. **마크다운 표시**: 분석 결과를 마크다운 텍스트로 화면에 렌더링
-6. **에러 처리**: 사용자 친화적인 에러 메시지 표시
+4. **구조화된 출력**: Gemini API의 `response_schema`를 사용한 JSON 형식 분석 결과 생성
+5. **탭 기반 UI**: 4개 탭으로 구성된 인터랙티브 분석 결과 표시
+6. **하위 호환성**: 기존 마크다운 텍스트 출력도 지원
+7. **에러 처리**: 사용자 친화적인 에러 메시지 표시
 
 ## 개발 시 주의사항
 
@@ -68,7 +69,8 @@
 │   │   │   └── page.tsx     # 메인 페이지
 │   │   └── components/
 │   │       ├── ImageUploader.tsx
-│   │       └── AnalysisDisplay.tsx
+│   │       ├── TabbedAnalysisDisplay.tsx  # 탭 기반 분석 결과 표시 (신규)
+│   │       └── AnalysisDisplay.tsx        # 마크다운 결과 표시 (하위 호환성)
 │   ├── package.json
 │   └── next.config.js
 ├── backend/                  # FastAPI 백엔드
@@ -76,7 +78,7 @@
 │   ├── api/
 │   │   └── analyze.py
 │   ├── models/
-│   │   └── portfolio.py
+│   │   └── portfolio.py     # 구조화된 출력용 Pydantic 모델
 │   ├── services/
 │   │   └── gemini_service.py
 │   ├── requirements.txt
@@ -94,13 +96,14 @@
 2. **백엔드 API 개발**
    - FastAPI 앱 설정
    - 이미지 업로드 엔드포인트 구현 (단일/다중 이미지 통합)
-   - Gemini API 연동 서비스 구현
-   - 마크다운 텍스트 응답 처리
+   - Gemini API 연동 서비스 구현 (구조화된 출력)
+   - JSON 및 마크다운 텍스트 응답 처리
 
 3. **프론트엔드 개발**
    - 이미지 업로드 컴포넌트 (다중 파일 지원)
    - API 호출 로직 (단일/다중 이미지 통합)
-   - 마크다운 텍스트 렌더링 컴포넌트
+   - 탭 기반 분석 결과 표시 컴포넌트 (신규)
+   - 마크다운 텍스트 렌더링 컴포넌트 (하위 호환성)
    - 에러 처리 UI
 
 4. **통합 테스트**
@@ -108,23 +111,36 @@
    - 다양한 이미지 형식 테스트
    - 에러 케이스 테스트
 
-## Gemini API 사용법 (Google Search 통합)
+## Gemini API 사용법 (구조화된 출력 + Google Search 통합)
 ```python
 from google import genai
+from pydantic import BaseModel
+
+# Pydantic 모델 정의
+class PortfolioReport(BaseModel):
+    version: str = "1.0"
+    reportDate: str
+    tabs: List[Tab]
 
 # API 키 설정
 client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
 
-# Google Search 도구를 포함한 모델 구성
-tools = [{"google_search": {}}]
-config = {"tools": tools}
+# 구조화된 출력 설정
+config = {
+    "response_mime_type": "application/json",
+    "response_schema": PortfolioReport,
+    "tools": [{"google_search": {}}]  # Google Search 통합
+}
 
-# 이미지와 프롬프트로 포트폴리오 분석 요청 (Google Search 활성화)
+# 이미지와 프롬프트로 포트폴리오 분석 요청 (구조화된 출력 + Google Search)
 response = client.models.generate_content(
     model='gemini-2.5-flash',
     contents=[prompt_text, image_data],
-    tools=tools
+    config=config
 )
+
+# 구조화된 응답 받기
+structured_data = response.parsed
 ```
 
 ## Google Search 기능 특징
@@ -148,10 +164,12 @@ response = client.models.generate_content(
 
 ## 성능 최적화
 - **분석 품질 최우선**: Gemini API 호출 시 비용이나 속도보다 상세하고 정확한 분석 결과를 얻도록 설정
+- **구조화된 출력 최적화**: JSON 스키마를 통한 일관된 데이터 형식으로 프론트엔드 렌더링 성능 향상
 - 이미지 압축 및 리사이징
 - API 응답 캐싱
 - 프론트엔드 코드 스플리팅
 - 백엔드 비동기 처리 최적화
+- **탭 기반 렌더링**: 필요한 탭만 렌더링하여 초기 로딩 시간 단축
 
 ## 보안 고려사항
 - 파일 업로드 보안 (파일 형식, 크기 제한)

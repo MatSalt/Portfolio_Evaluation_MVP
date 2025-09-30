@@ -9,13 +9,15 @@ import os
 import asyncio
 import base64
 import hashlib
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union
 from io import BytesIO
 import logging
+import uuid
+import time
 from google import genai
 from google.genai.types import GenerateContentConfig, Part
 
-from models.portfolio import AnalysisResponse, SAMPLE_MARKDOWN_CONTENT
+from models.portfolio import AnalysisResponse, SAMPLE_MARKDOWN_CONTENT, StructuredAnalysisResponse, PortfolioReport
 from utils.image_utils import validate_image, optimize_image
 
 # 로깅 설정
@@ -470,7 +472,7 @@ class GeminiService:
         다중 포트폴리오 이미지 분석
         
         Args:
-            image_data_list: 이미지 바이트 데이터 리스트
+        	image_data_list: 이미지 바이트 데이터 리스트
         
         Returns:
             str: 마크다운 형식의 분석 결과
@@ -542,6 +544,227 @@ class GeminiService:
         except Exception as e:
             logger.error(f"샘플 분석 결과 생성 실패: {str(e)}")
             raise ValueError(f"샘플 데이터 오류: {str(e)}")
+
+    # ============================================
+    # 구조화된 출력 메서드 (Phase 6 추가)
+    # ============================================
+
+    def _get_structured_prompt(self) -> str:
+        """구조화된 JSON 출력용 프롬프트 (스키마 명시)"""
+        return """
+당신은 전문 포트폴리오 분석가입니다. 제공된 포트폴리오 이미지를 분석하여 다음 JSON 스키마에 **정확히** 맞는 데이터를 생성하세요.
+
+**중요**: 응답은 반드시 유효한 JSON 형식이어야 하며, 아래 스키마를 엄격히 따라야 합니다.
+
+**JSON 스키마:**
+
+{
+  "version": "1.0",
+  "reportDate": "YYYY-MM-DD",
+  "tabs": [
+    {
+      "tabId": "dashboard",
+      "tabTitle": "총괄 요약",
+      "content": {
+        "overallScore": {
+          "title": "포트폴리오 종합 스코어",
+          "score": 0-100,
+          "maxScore": 100
+        },
+        "coreCriteriaScores": [
+          {"criterion": "성장 잠재력", "score": 0-100, "maxScore": 100},
+          {"criterion": "안정성 및 방어력", "score": 0-100, "maxScore": 100},
+          {"criterion": "전략적 일관성", "score": 0-100, "maxScore": 100}
+        ],
+        "strengths": ["강점1", "강점2"],
+        "weaknesses": ["약점1", "약점2"]
+      }
+    },
+    {
+      "tabId": "deepDive",
+      "tabTitle": "포트폴리오 심층 분석",
+      "content": {
+        "inDepthAnalysis": [
+          {"title": "성장 잠재력", "score": 0-100, "description": "최소 50자 상세 분석"},
+          {"title": "안정성 및 방어력", "score": 0-100, "description": "최소 50자 상세 분석"},
+          {"title": "전략적 일관성", "score": 0-100, "description": "최소 50자 상세 분석"}
+        ],
+        "opportunities": {
+          "title": "기회 및 개선 방안",
+          "items": [
+            {"summary": "요약", "details": "최소 30자 상세 설명 (What-if 시나리오 포함)"}
+          ]
+        }
+      }
+    },
+    {
+      "tabId": "allStockScores",
+      "tabTitle": "개별 종목 스코어",
+      "content": {
+        "scoreTable": {
+          "headers": ["주식", "Overall", "펀더멘탈", "기술 잠재력", "거시경제", "시장심리", "CEO/리더십"],
+          "rows": [
+            {
+              "주식": "종목명",
+              "Overall": 0-100,
+              "펀더멘탈": 0-100,
+              "기술 잠재력": 0-100,
+              "거시경제": 0-100,
+              "시장심리": 0-100,
+              "CEO/리더십": 0-100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tabId": "keyStockAnalysis",
+      "tabTitle": "핵심 종목 상세 분석",
+      "content": {
+        "analysisCards": [
+          {
+            "stockName": "종목명",
+            "overallScore": 0-100,
+            "detailedScores": [
+              {"category": "펀더멘탈", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "기술 잠재력", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "거시경제", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "시장심리", "score": 0-100, "analysis": "최소 30자 분석"},
+              {"category": "CEO/리더십", "score": 0-100, "analysis": "최소 30자 분석"}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+
+필수 요구사항:
+1) 모든 점수는 0-100 사이 정수
+2) tabs 배열은 정확히 4개 (dashboard, deepDive, allStockScores, keyStockAnalysis)
+3) reportDate는 오늘 날짜 (YYYY-MM-DD 형식)
+4) description/analysis/details는 구체적이고 전문적으로 작성
+5) Google Search를 활용하여 최신 정보 반영
+6) 모든 텍스트는 한국어로 작성
+7) **반드시 유효한 JSON 형식으로만 응답** (추가 설명이나 마크다운 없이)
+8) JSON 시작 전후에 ```json``` 같은 마크다운 코드 블록 사용 금지
+"""
+
+    async def _call_gemini_structured(self, image_data_list: List[bytes]) -> PortfolioReport:
+        """Gemini API 구조화된 출력 호출 (JSON 모드: 서버에서 Pydantic 검증)"""
+        for attempt in range(self.max_retries):
+            try:
+                logger.info(
+                    f"Gemini API 구조화된 출력 호출 시도 {attempt + 1}/{self.max_retries}"
+                )
+
+                contents: List[Union[str, Part]] = []
+                # 1) 이미지 파트
+                for i, image_data in enumerate(image_data_list):
+                    image_part = Part.from_bytes(data=image_data, mime_type="image/jpeg")
+                    contents.append(image_part)
+                    logger.debug(f"구조화: 이미지 {i+1}/{len(image_data_list)} 추가")
+                # 2) 프롬프트
+                contents.append(self._get_structured_prompt())
+
+                # 3) Google Search 도구
+                from google.genai import types
+                grounding_tool = types.Tool(google_search=types.GoogleSearch())
+
+                # 4) 설정: response_mime_type 제거, Google Search 툴 유지
+                config = GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=8192,
+                    tools=[grounding_tool],
+                )
+
+                # 5) API 호출
+                response = self.client.models.generate_content(
+                    model=self.model_name, contents=contents, config=config
+                )
+
+                # 6) JSON 텍스트 파싱 및 Pydantic 검증
+                if response and getattr(response, "text", None):
+                    logger.info("Gemini API 응답 수신, JSON 추출 및 Pydantic 검증 시작")
+                    
+                    # 응답에서 JSON 부분만 추출 (마크다운 코드 블록 제거)
+                    response_text = response.text.strip()
+                    
+                    # ```json``` 코드 블록이 있는 경우 제거
+                    if response_text.startswith("```json"):
+                        response_text = response_text[7:]  # ```json 제거
+                    if response_text.startswith("```"):
+                        response_text = response_text[3:]   # ``` 제거
+                    if response_text.endswith("```"):
+                        response_text = response_text[:-3]  # 끝의 ``` 제거
+                    
+                    response_text = response_text.strip()
+                    
+                    try:
+                        portfolio_report = PortfolioReport.model_validate_json(response_text)
+                        logger.info("PortfolioReport 검증 성공")
+                        return portfolio_report
+                    except Exception as validation_error:
+                        logger.error(f"Pydantic 검증 실패: {str(validation_error)}")
+                        # 응답 일부 로깅 (과도한 로그 방지)
+                        preview = response_text[:500] if isinstance(response_text, str) else str(response_text)[:500]
+                        logger.debug(f"응답 텍스트 미리보기: {preview}...")
+                        raise ValueError(
+                            f"Gemini 응답이 스키마와 일치하지 않습니다: {str(validation_error)}"
+                        )
+
+                raise ValueError("Gemini API에서 JSON 응답을 받지 못했습니다.")
+
+            except Exception as e:
+                logger.error(f"구조화된 출력 호출 실패 (시도 {attempt + 1}): {str(e)}")
+                if attempt == self.max_retries - 1:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+
+    async def analyze_portfolio_structured(
+        self, image_data_list: List[bytes], format_type: str = "json"
+    ) -> Union[StructuredAnalysisResponse, AnalysisResponse]:
+        """포트폴리오 분석 - format에 따라 JSON 또는 마크다운 반환"""
+        start_time = time.time()
+        request_id = str(uuid.uuid4())
+
+        # 입력 검증
+        if not image_data_list or len(image_data_list) == 0:
+            raise ValueError("분석할 이미지가 없습니다.")
+        if len(image_data_list) > 5:
+            raise ValueError("최대 5개의 이미지만 분석 가능합니다.")
+        for i, image_data in enumerate(image_data_list):
+            await validate_image(image_data)
+
+        if format_type == "json":
+            try:
+                portfolio_report = await self._call_gemini_structured(image_data_list)
+            except ValueError as ve:
+                # Pydantic 검증 실패 또는 스키마 불일치 등
+                logger.error(f"JSON 스키마 검증 실패: {str(ve)}")
+                raise ValueError("AI 응답이 예상 형식과 다릅니다. 다시 시도해 주세요.")
+            return StructuredAnalysisResponse(
+                portfolioReport=portfolio_report,
+                processing_time=time.time() - start_time,
+                request_id=request_id,
+                images_processed=len(image_data_list),
+            )
+        else:
+            # 기존 마크다운 출력 재사용
+            if len(image_data_list) == 1:
+                markdown_content = await self.analyze_portfolio_image(
+                    image_data_list[0], use_cache=True
+                )
+            else:
+                markdown_content = await self.analyze_multiple_portfolio_images(
+                    image_data_list
+                )
+            return AnalysisResponse(
+                content=markdown_content,
+                processing_time=time.time() - start_time,
+                request_id=request_id,
+                images_processed=len(image_data_list),
+            )
 
 # 싱글톤 인스턴스
 _gemini_service: Optional[GeminiService] = None

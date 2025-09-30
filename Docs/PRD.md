@@ -5,19 +5,19 @@
 ## **PRD: AI 포트폴리오 추출 MVP**
 
   * **제품명:** 포트폴리오 스코어 (Portfolio Score) - 추출 기능 MVP
-  * **버전:** 0.1
-  * **목표:** 사용자가 포트폴리오 화면 캡처(단일 또는 다중)를 업로드하면, AI Vision 모델로 보유 종목 데이터를 추출하고 이를 기반으로 **AI 총평, 포트폴리오 종합 리니아 스코어, 3대 핵심 기준 스코어, 종목별 상세 분석 카드**를 생성·제공한다. (사용자 편집 플로우 제외)
+  * **버전:** 0.2 (탭 기반 UI 및 구조화된 출력 지원)
+  * **목표:** 사용자가 포트폴리오 화면 캡처(단일 또는 다중)를 업로드하면, AI Vision 모델로 보유 종목 데이터를 추출하고 이를 기반으로 **구조화된 JSON 데이터**를 생성하여 **4개 탭으로 구성된 인터랙티브 UI**에 표시한다.
 
 -----
 
-### \#\# 1. 사용자 플로우 (User Flow)
+### ## 1. 사용자 플로우 (User Flow)
 
 1.  **[진입]** 메인 페이지 진입 → 업로드 영역 표시.
 2.  **[업로드]** 스크린샷 업로드(버튼/드래그 앤 드롭, 최대 5개 이미지 지원).
 3.  **[처리]** 프론트엔드가 이미지(단일/다중)를 백엔드 `/api/analyze`로 전송, 로딩 인디케이터 표시.
-4.  **[AI 분석 출력]** 백엔드 분석 완료 후, **AI 총평/종합 스코어/3대 기준 스코어/종목별 분석 카드**를 **마크다운 텍스트**로 화면에 표시.
+4.  **[AI 분석 출력]** 백엔드 분석 완료 후, **구조화된 JSON 데이터**를 받아 **4개 탭으로 구성된 인터랙티브 UI**에 표시.
 
-### \#\# 2. 핵심 기능 명세 (Core Feature Specifications)
+### ## 2. 핵심 기능 명세 (Core Feature Specifications)
 
 #### **2.1. 프론트엔드 (Frontend - Next.js)**
 
@@ -44,9 +44,21 @@
               * '분석하기' 버튼 클릭 시 `loading` 상태로 변경.
               * 단일/다중 이미지 모두 백엔드의 `/api/analyze` 엔드포인트로 `multipart/form-data` 형식의 `POST` 요청을 보낸다.
 
-      * **`AnalysisDisplay.tsx`**
+      * **`TabbedAnalysisDisplay.tsx`** (신규)
 
-          * **기능:** LLM이 생성한 최종 분석 리포트(마크다운)를 화면에 렌더링한다.
+          * **기능:** LLM이 생성한 구조화된 JSON 데이터를 4개 탭으로 나누어 표시한다.
+          * **요구사항:** 
+              * **탭 1: 총괄 요약 (Dashboard)** - 종합 점수, 핵심 기준 점수, 강점/약점
+              * **탭 2: 포트폴리오 심층 분석 (Deep Dive)** - 각 기준별 상세 분석, 기회 및 개선 방안
+              * **탭 3: 개별 종목 스코어 (All Stock Scores)** - 모든 종목의 점수 테이블
+              * **탭 4: 핵심 종목 상세 분석 (Key Stock Analysis)** - 주요 종목들의 상세 분석 카드
+              * 탭 전환 시 부드러운 애니메이션 효과
+              * 반응형 디자인으로 모바일/데스크톱 모두 지원
+              * 점수 시각화 (프로그레스 바, 차트 등)
+
+      * **`AnalysisDisplay.tsx`** (기존 - 하위 호환성 유지)
+
+          * **기능:** LLM이 생성한 최종 분석 리포트(마크다운)를 화면에 렌더링한다. `format=markdown` 쿼리 파라미터로 요청 시 사용된다.
           * **요구사항:** 
               * `react-markdown` 라이브러리를 사용하여 API로부터 받은 마크다운 텍스트를 HTML로 변환한다.
               * `expected_result.md` 예시와 같이 테이블, 리스트, 강조 등 마크다운 요소가 올바르게 스타일링되어야 한다.
@@ -63,13 +75,15 @@
           * **요청 (Request):**
               * **Content-Type:** `multipart/form-data`
               * **Body:** `files` (이미지 파일 배열, 1-5개)
+              * **Query Parameter:** `format` (선택사항: `markdown` 또는 `json`, 기본값: `json`)
           * **처리 로직 (Processing Logic):**
             1.  요청으로부터 이미지 파일 배열(`List[UploadFile]`)을 받는다.
             2.  이미지 파일들을 메모리에서 읽어 **Base64**로 인코딩한다.
-            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 \*\*프롬프트(Prompt)\*\*와 인코딩된 이미지들을 포함하여 요청을 구성한다.
-            4.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
-            5.  LLM이 반환한 **마크다운 형식의 텍스트 응답**을 그대로 받는다.
-            6.  성공 시, 상태 코드 `200 OK`와 함께 **마크다운 텍스트**를 반환한다.
+            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 **프롬프트(Prompt)**와 인코딩된 이미지들을 포함하여 요청을 구성한다.
+            4.  **구조화된 출력 설정**: `response_mime_type="application/json"` 및 `response_schema`를 사용하여 JSON 형식으로 응답을 받는다.
+            5.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
+            6.  LLM이 반환한 **구조화된 JSON 응답**을 검증하고 파싱한다.
+            7.  성공 시, 상태 코드 `200 OK`와 함께 **구조화된 JSON 데이터**를 반환한다.
           * **에러 핸들링 (Error Handling):**
               * 이미지 파일이 아닐 경우: `400 Bad Request`
               * 파일 개수가 1-5개 범위를 벗어날 경우: `400 Bad Request`
@@ -77,30 +91,55 @@
               * LLM 응답 형식 오류 시: `500 Internal Server Error`
           * **응답 (Response):** 아래 **3. 데이터 요구사항** 참조
 
-### \#\# 3. 데이터 요구사항 (Data & API Specification)
+### ## 3. 데이터 요구사항 (Data & API Specification)
 
-#### **3.1. Gemini API 통합 및 프롬프트 (Gemini API Integration & Prompt)**
+#### **3.1. Gemini API 통합 및 구조화된 출력 (Gemini API Integration & Structured Output)**
 
-백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 프롬프트 예시입니다. 이 프롬프트는 캡처 이미지에서 포트폴리오를 인식·정규화하고, **Google Search를 통한 실시간 정보 검색**과 함께 **expected_result.md와 동일한 마크다운 형식의 분석 결과**를 생성하도록 지시합니다.
+백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 구조화된 출력 설정입니다. [공식 문서](https://ai.google.dev/gemini-api/docs/structured-output?hl=ko#generating-json)를 참고하여 Pydantic 모델을 사용한 스키마 정의를 적용합니다.
 
-**Google Gen AI Python SDK 사용법 (Google Search 통합):**
+**Google Gen AI Python SDK 구조화된 출력 사용법:**
 ```python
 from google import genai
+from pydantic import BaseModel
+
+# Pydantic 모델 정의
+class PortfolioReport(BaseModel):
+    version: str = "1.0"
+    reportDate: str
+    tabs: List[Tab]
+
+class ApiResponse(BaseModel):
+    portfolioReport: PortfolioReport
+    processing_time: float
+    request_id: str
+    images_processed: int
 
 # API 키 설정
 client = genai.Client(api_key='YOUR_GEMINI_API_KEY')
 
-# Google Search 도구를 포함한 모델 구성
-tools = [{"google_search": {}}]
-config = {"tools": tools}
+# 구조화된 출력 설정
+config = {
+    "response_mime_type": "application/json",
+    "response_schema": PortfolioReport,
+    "tools": [{"google_search": {}}]  # Google Search 통합
+}
 
-# 이미지와 프롬프트로 포트폴리오 분석 요청 (Google Search 활성화)
+# 이미지와 프롬프트로 포트폴리오 분석 요청
 response = client.models.generate_content(
     model='gemini-2.5-flash',
     contents=[prompt_text, image_data],
-    tools=tools
+    config=config
 )
+
+# 구조화된 응답 받기
+structured_data = response.parsed
 ```
+
+**구조화된 출력의 장점:**
+- **일관된 데이터 형식**: JSON 스키마를 통해 항상 동일한 구조의 데이터 보장
+- **타입 안전성**: Pydantic 모델을 통한 자동 검증 및 타입 체크
+- **프론트엔드 최적화**: 탭 기반 UI에 바로 사용 가능한 구조화된 데이터
+- **확장성**: 새로운 필드나 탭 추가 시 스키마만 수정하면 됨
 
 **Google Search 기능 특징:**
 - **실시간 정보 검색**: 최신 시장 동향, 뉴스, 재무 정보를 실시간으로 검색
@@ -110,90 +149,152 @@ response = client.models.generate_content(
 
 **참고 자료**: 
 - Gemini API 상세 정보: `/Users/choongheon/Desktop/Rinia/projects/Portfolio_Evaluation_MVP/Docs/gemini_llms.txt`
+- 구조화된 출력: https://ai.google.dev/gemini-api/docs/structured-output?hl=ko#generating-json
 - Google Search 통합: https://ai.google.dev/gemini-api/docs/google-search?hl=ko
-- Live API 도구 사용: https://ai.google.dev/gemini-api/docs/live-tools?hl=ko
 
-```text
-당신은 포트폴리오 분석 전문가입니다. 제공된 증권사 앱 스크린샷(단일 또는 다중)에서 보유 종목을 추출하고 종합적인 투자 분석을 수행하세요.
+#### **3.2. 구조화된 JSON 스키마 (Structured JSON Schema)**
 
-다음 마크다운 형식으로 정확히 출력하세요 (추가 텍스트 없이):
-
-**AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]
-
-**포트폴리오 종합 리니아 스코어: [0-100] / 100**
-
-**3대 핵심 기준 스코어:**
-
-- **성장 잠재력:** [0-100] / 100
-- **안정성 및 방어력:** [0-100] / 100
-- **전략적 일관성:** [0-100] / 100
-
-**[1] 포트폴리오 리니아 스코어 심층 분석**
-
-**1.1 성장 잠재력 분석 ([점수] / 100): [제목]**
-
-[3-4문장의 구체적 분석]
-
-**1.2 안정성 및 방어력 분석 ([점수] / 100): [제목]**
-
-[3-4문장의 구체적 분석]
-
-**1.3 전략적 일관성 분석 ([점수] / 100): [제목]**
-
-[3-4문장의 구체적 분석]
-
-**[2] 포트폴리오 강점 및 약점, 그리고 기회**
-
-**💪 강점**
-
-- [강점 1: 1-2문장, 실행 가능한 인사이트]
-- [강점 2: 1-2문장, 실행 가능한 인사이트]
-
-**📉 약점**
-
-- [약점 1: 1-2문장, 구체적 개선방안]
-- [약점 2: 1-2문장, 구체적 개선방안]
-
-**💡 기회 및 개선 방안**
-
-- [기회 1: What-if 시나리오 포함]
-- [기회 2: 구체적 실행 방안]
-
-**[3] 개별 종목 리니아 스코어 상세 분석**
-
-**3.1 스코어 요약 테이블**
-
-| 주식 | Overall (100점 만점) | 펀더멘탈 | 기술 잠재력 | 거시경제 | 시장심리 | CEO/리더십 |
-| --- | --- | --- | --- | --- | --- | --- |
-| [종목명] | [점수] | [점수] | [점수] | [점수] | [점수] | [점수] |
-
-**3.2 개별 종목 분석 카드**
-
-**[번호]. [종목명] - Overall: [점수] / 100**
-
-- **펀더멘탈 ([점수]/100):** [상세 분석]
-- **기술 잠재력 ([점수]/100):** [상세 분석]
-- **거시경제 ([점수]/100):** [상세 분석]
-- **시장심리 ([점수]/100):** [상세 분석]
-- **CEO/리더십 ([점수]/100):** [상세 분석]
-
-분석 규칙:
-- 모든 점수는 0-100 사이의 정수로 평가
-- 각 분석은 구체적이고 전문적인 내용으로 작성
-- 강점/약점/기회는 실행 가능한 인사이트 제공
-- 기회에는 간단한 "What-if" 시나리오 포함
-- 모든 텍스트는 한국어로 작성
-- 전문적인 투자 분석 언어 사용
-- 구체적인 예시와 데이터 포인트 포함
+**포트폴리오 리포트 JSON 구조:**
+```json
+{
+  "portfolioReport": {
+    "version": "1.0",
+    "reportDate": "2025-09-30",
+    "tabs": [
+      {
+        "tabId": "dashboard",
+        "tabTitle": "총괄 요약",
+        "content": {
+          "overallScore": {
+            "title": "포트폴리오 종합 스코어",
+            "score": 72,
+            "maxScore": 100
+          },
+          "coreCriteriaScores": [
+            {
+              "criterion": "성장 잠재력",
+              "score": 88,
+              "maxScore": 100
+            },
+            {
+              "criterion": "안정성 및 방어력",
+              "score": 55,
+              "maxScore": 100
+            },
+            {
+              "criterion": "전략적 일관성",
+              "score": 74,
+              "maxScore": 100
+            }
+          ],
+          "strengths": [
+            "선구적인 미래 기술 투자",
+            "명확하고 일관된 투자 테마",
+            "높은 잠재 수익률"
+          ],
+          "weaknesses": [
+            "극심한 변동성 노출",
+            "기술 섹터 집중 리스크",
+            "재무적 안정성 부족"
+          ]
+        }
+      },
+      {
+        "tabId": "deepDive",
+        "tabTitle": "포트폴리오 심층 분석",
+        "content": {
+          "inDepthAnalysis": [
+            {
+              "title": "성장 잠재력 분석: 미래 기술에 대한 강력한 베팅",
+              "score": 88,
+              "description": "문영님의 포트폴리오는 '기술 잠재력' 및 'CEO/리더십' 인덱스 점수가 매우 높은 종목들에 집중적으로 투자되어 있어..."
+            },
+            {
+              "title": "안정성 및 방어력 분석: 기술주 특유의 변동성 노출",
+              "score": 55,
+              "description": "포트폴리오의 안정성 및 방어력 점수는 55점으로 상대적으로 낮은 수준입니다..."
+            },
+            {
+              "title": "전략적 일관성 분석: 명확한 테마 속 집중도 리스크",
+              "score": 74,
+              "description": "문영님의 포트폴리오는 '양자 컴퓨팅'과 'AI'라는 명확한 투자 테마를 중심으로 구성되어 있어..."
+            }
+          ],
+          "opportunities": {
+            "title": "기회 및 개선 방안",
+            "items": [
+              {
+                "summary": "안정적인 '핵심' 자산 추가",
+                "details": "현재 포트폴리오에는 변동성을 상쇄할 강력한 '핵심' 자산이 부족합니다..."
+              },
+              {
+                "summary": "What-if 시나리오",
+                "details": "만약 TIGER 미국S&P500 ETF 비중을 현재 5백만원대에서 1천만원대로 높인다면..."
+              },
+              {
+                "summary": "유사 테마 내 분산 투자",
+                "details": "양자 컴퓨팅 및 AI 테마는 유지하되, 관련 산업 내에서도 서로 다른 세부 기술 분야나 지역에 분산 투자하여..."
+              },
+              {
+                "summary": "리스크 관리 전략 도입",
+                "details": "시장의 변동성에 대비하여 일정 비율의 현금을 보유하거나, 방어적인 섹터의 ETF를 소액 편입하는 등의 전략을..."
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tabId": "allStockScores",
+        "tabTitle": "개별 종목 스코어",
+        "content": {
+          "scoreTable": {
+            "headers": ["주식", "Overall", "펀더멘탈", "기술 잠재력", "거시경제", "시장심리", "CEO/리더십"],
+            "rows": [
+              {"주식": "팔란티어 (PLTR)", "Overall": 78, "펀더멘탈": 70, "기술 잠재력": 95, "거시경제": 75, "시장심리": 85, "CEO/리더십": 85},
+              {"주식": "브로드컴 (AVGO)", "Overall": 82, "펀더멘탈": 85, "기술 잠재력": 80, "거시경제": 80, "시장심리": 80, "CEO/리더십": 85}
+              // ... 이하 모든 종목 데이터
+            ]
+          }
+        }
+      },
+      {
+        "tabId": "keyStockAnalysis",
+        "tabTitle": "핵심 종목 상세 분석",
+        "content": {
+          "analysisCards": [
+            {
+              "stockName": "팔란티어 테크놀로지스 (PLTR)",
+              "overallScore": 78,
+              "detailedScores": [
+                { "category": "펀더멘탈", "score": 70, "analysis": "꾸준한 매출 성장과 최근 GAAP 기준 흑자 전환 성공은 긍정적이나..." },
+                { "category": "기술 잠재력", "score": 95, "analysis": "빅데이터 분석 및 AI 분야 독보적인 기술력으로 고담(정부) 및 AIP(상업) 플랫폼 모두에서..." },
+                { "category": "거시경제", "score": 75, "analysis": "전 세계적인 AI 도입 가속화의 직접 수혜주..." },
+                { "category": "시장심리", "score": 85, "analysis": "CEO의 적극적인 소통과 AI 시장 성장에 대한 기대로 개인 투자자들의 높은 지지를 받습니다..." },
+                { "category": "CEO/리더십", "score": 85, "analysis": "독특한 비전과 강력한 리더십으로 혁신을 주도하고 있습니다..." }
+              ]
+            }
+            // ... 이하 다른 핵심 종목 카드
+          ]
+        }
+      }
+    ]
+  }
+}
 ```
 
-#### **3.2. API 응답 형식 (API Response Schema)**
+#### **3.3. API 응답 형식 (API Response Schema)**
 
   * **성공 (Success - `200 OK`):**
 
     ```json
     {
-      "content": "**AI 총평:** 문영님의 포트폴리오는 '양자 컴퓨팅 및 AI 기술 혁신 추구형' 전략을 명확히 따르고 있으며, 잠재력은 높으나 기술주의 높은 변동성과 신흥 기술 리스크에 다소 취약합니다.\n\n**포트폴리오 종합 리니아 스코어: 72 / 100**\n\n**3대 핵심 기준 스코어:**\n\n- **성장 잠재력:** 88 / 100\n- **안정성 및 방어력:** 55 / 100\n- **전략적 일관성:** 74 / 100\n\n... (expected_result.md와 동일한 마크다운 형식의 전체 분석 결과)",
+      "portfolioReport": {
+        "version": "1.0",
+        "reportDate": "2025-09-30",
+        "tabs": [
+          // 위의 JSON 구조와 동일
+        ]
+      },
       "processing_time": 15.2,
       "request_id": "uuid-string",
       "images_processed": 3
@@ -210,31 +311,54 @@ response = client.models.generate_content(
     }
     ```
 
+#### **3.4. 탭 기반 UI 구조 (Tab-based UI Structure)**
+
+**탭 1: 총괄 요약 (Dashboard)**
+- 포트폴리오 종합 스코어 (큰 숫자로 강조)
+- 3대 핵심 기준 스코어 (프로그레스 바 형태)
+- 강점/약점 (아이콘과 함께 카드 형태)
+
+**탭 2: 포트폴리오 심층 분석 (Deep Dive)**
+- 각 기준별 상세 분석 (점수와 함께 설명)
+- 기회 및 개선 방안 (액션 아이템 형태)
+
+**탭 3: 개별 종목 스코어 (All Stock Scores)**
+- 모든 종목의 점수 테이블 (정렬 가능)
+- 점수별 색상 코딩 (높은 점수: 녹색, 낮은 점수: 빨간색)
+
+**탭 4: 핵심 종목 상세 분석 (Key Stock Analysis)**
+- 주요 종목들의 상세 분석 카드
+- 각 종목별 5가지 기준 점수와 분석
+
 -----
 
-### \#\# 4. 기술 스택 (Technology Stack)
+### ## 4. 기술 스택 (Technology Stack)
 
   * **프론트엔드:** Next.js 15.5.3 (TypeScript)
-  * **마크다운 렌더링:** react-markdown, remark-gfm
+  * **UI 라이브러리:** Tailwind CSS, Headless UI (탭 컴포넌트)
+  * **차트/시각화:** Chart.js 또는 Recharts (점수 시각화)
   * **백엔드:** Python 3.13.7, FastAPI 0.116.1
     * 공식 문서: https://fastapi.tiangolo.com/reference/
     * GitHub 저장소: https://github.com/fastapi/fastapi
     * 특징: 고성능, 자동 문서화, 타입 힌트 지원
   * **AI 모델:** Google Gemini 2.5 Flash API (google-genai Python SDK)
+    * **구조화된 출력**: Pydantic 모델을 사용한 JSON 스키마 정의
     * **Google Search 통합**: Gemini API의 `google_search` 도구를 활용한 실시간 웹 검색
     * **그라운딩 기능**: 검색된 정보를 기반으로 한 정확한 분석 제공
+  * **데이터 검증:** Pydantic (백엔드), Zod (프론트엔드)
   * **클라우드 스토리지:** Google Cloud Storage
   * **배포:** Vercel (Frontend), Render (Backend)
 
 -----
 
-### \#\# 5. 범위 외 (Out of Scope for MVP)
+### ## 5. 범위 외 (Out of Scope for MVP)
 
   * 사용자 회원가입 및 로그인
   * 포트폴리오 데이터 저장 및 이력 관리
   * 추출된 데이터를 기반으로 한 **2차 분석** (위험도, 자산 배분 시각화 등)
   * 실시간 시세 연동
   * 다크 모드 등 UI 테마 기능
+  * 탭 간 데이터 공유 및 비교 기능
 
 -----
 
@@ -252,18 +376,21 @@ response = client.models.generate_content(
 ### ## 7. 성능 최적화 (Performance)
 
   * Google Gen AI Python SDK를 통한 Gemini 2.5 Flash API의 설정을 조절하여 비용이나 속도보다 **분석의 상세함과 품질**을 최우선으로 한다.
+  * **구조화된 출력 최적화**: JSON 스키마를 통한 일관된 데이터 형식으로 프론트엔드 렌더링 성능 향상
   * **Google Search 최적화**: 검색 쿼리를 효율적으로 구성하여 관련성 높은 정보만 검색하고 응답 시간을 단축한다.
   * **다중 이미지 처리 최적화**: 단일 API 요청으로 여러 이미지를 처리하여 효율성을 극대화한다.
   * 동일 이미지 반복 분석에 대한 캐싱 전략(해시 기반 중복 방지)을 적용한다.
   * 비동기 I/O로 업로드/LLM 호출/Google Search 파이프라인을 병렬화한다.
   * **검색 결과 캐싱**: 동일한 검색 쿼리에 대해 일정 시간 동안 캐시된 결과를 활용하여 API 호출 비용을 절약한다.
+  * **탭 기반 렌더링**: 필요한 탭만 렌더링하여 초기 로딩 시간 단축
 
 -----
 
 ### ## 8. 테스트 및 배포 (Testing & CI/CD)
 
-  * 단위 테스트: 이미지 처리 로직, 프롬프트 유효성 테스트, Google Search API 호출 테스트.
-  * 통합 테스트: 실제 샘플 스크린샷으로 엔드투엔드 검증, Google Search 결과 검증.
-  * **Google Search 테스트**: 검색 쿼리 생성, 결과 파싱, 출처 정보 추출 테스트.
-  * 사용자 수용 테스트(UAT): 다양한 브로커리지 UI 스킨에 대한 견고성 확인, 검색 결과 정확성 검증.
-  * CI/CD: 메인 병합 시 자동 빌드/배포(프론트: Vercel, 백엔드: Render), 시크릿 관리, Google Search API 키 관리.
+  * 단위 테스트: 이미지 처리 로직, 프롬프트 유효성 테스트, Google Search API 호출 테스트, JSON 스키마 검증 테스트
+  * 통합 테스트: 실제 샘플 스크린샷으로 엔드투엔드 검증, Google Search 결과 검증, 탭 UI 렌더링 테스트
+  * **구조화된 출력 테스트**: JSON 스키마 준수, Pydantic 모델 검증, 프론트엔드 파싱 테스트
+  * **Google Search 테스트**: 검색 쿼리 생성, 결과 파싱, 출처 정보 추출 테스트
+  * 사용자 수용 테스트(UAT): 다양한 브로커리지 UI 스킨에 대한 견고성 확인, 검색 결과 정확성 검증, 탭 UI 사용성 테스트
+  * CI/CD: 메인 병합 시 자동 빌드/배포(프론트: Vercel, 백엔드: Render), 시크릿 관리, Google Search API 키 관리

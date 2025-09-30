@@ -1,15 +1,19 @@
 # Portfolio Evaluation MVP - Cursor Rules
 
 ## 프로젝트 개요
-이 프로젝트는 AI Vision 모델과 Google Search 기능을 통합하여 증권사 앱의 포트폴리오 스크린샷(단일 또는 다중)을 분석하고, expected_result.md와 동일한 형식의 마크다운 텍스트로 종합적인 포트폴리오 평가(리니아 스코어)와 상세한 종목별 분석을 제공하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
+이 프로젝트는 AI Vision 모델과 Google Search 기능을 통합하여 증권사 앱의 포트폴리오 스크린샷(단일 또는 다중)을 분석하고, **구조화된 JSON 데이터**를 생성하여 **4개 탭으로 구성된 인터랙티브 UI**에 표시하는 MVP입니다. 사용자는 업로드한 포트폴리오에 대해 AI 총평, 3대 핵심 기준 스코어, 강점/약점/기회 분석, 개별 종목의 5가지 평가 기준별 상세 분석을 받을 수 있습니다.
 
 ## 기술 스택
 - **프론트엔드**: Next.js 15.5.3 (TypeScript)
+- **UI 라이브러리**: Tailwind CSS, Headless UI (탭 컴포넌트)
+- **차트/시각화**: Chart.js 또는 Recharts (점수 시각화)
 - **백엔드**: Python 3.13.7, FastAPI 0.116.1
 - **AI 모델**: Google Gemini 2.5 Flash API (google-genai Python SDK)
+  - **구조화된 출력**: Pydantic 모델을 사용한 JSON 스키마 정의
   - **Google Search 통합**: Gemini API의 `google_search` 도구를 활용한 실시간 웹 검색
   - **그라운딩 기능**: 검색된 정보를 기반으로 한 정확한 분석 제공
-- **마크다운 렌더링**: react-markdown, remark-gfm
+- **데이터 검증**: Pydantic (백엔드), Zod (프론트엔드)
+- **마크다운 렌더링**: react-markdown, remark-gfm (하위 호환성)
 - **배포**: Vercel (Frontend), Render (Backend)
 
 ## 기술 스택 최신화 정책
@@ -45,8 +49,9 @@
 5. 에러 처리는 try-catch 블록을 사용합니다.
 6. 파일 구조:
    - `src/app/page.tsx`: 메인 페이지
-   - `src/components/ImageUploader.tsx`: 이미지 업로드 컴포넌트
-   - `src/components/AnalysisDisplay.tsx`: 분석 결과 표시 컴포넌트
+   - `src/components/ImageUploader.tsx`: 이미지 업로드 컴포넌트 (다중 이미지 지원)
+   - `src/components/AnalysisDisplay.tsx`: 분석 결과 표시 컴포넌트 (하위 호환성)
+   - `src/components/TabbedAnalysisDisplay.tsx`: 탭 기반 분석 결과 표시 컴포넌트
 
 ### 백엔드 (FastAPI)
 1. **FastAPI 관련 코드 작성 시 항상 공식 문서 참고 필수**:
@@ -57,8 +62,8 @@
 4. 에러 처리는 HTTPException을 사용합니다.
 5. 파일 구조:
    - `main.py`: FastAPI 앱 진입점
-   - `api/analyze.py`: 포트폴리오 분석 API
-   - `models/`: Pydantic 모델 정의
+   - `api/analyze.py`: 포트폴리오 분석 API (구조화된 출력 지원)
+   - `models/`: Pydantic 모델 정의 (구조화된 출력 스키마)
    - `services/`: 비즈니스 로직
 
 ### Gemini API 연동
@@ -76,25 +81,58 @@
    tools = [{"google_search": {}}]
    config = {"tools": tools}
    ```
-6. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 expected_result.md와 동일한 마크다운 형식으로 다음을 생성하도록 합니다:
-   - AI 총평 (2-3문장)
-   - 종합 리니아 스코어 (0-100)
-   - 3대 핵심 기준 스코어 (성장 잠재력, 안정성 및 방어력, 전략적 일관성)
-   - 상세 분석 (각 기준별 3-4문장)
-   - 강점/약점/기회 분석 (실행 가능한 인사이트 및 What-if 시나리오 포함)
-   - 개별 종목별 5가지 평가 기준 점수 및 상세 분석
-7. API 호출 시 상세하고 높은 품질의 마크다운 텍스트 응답을 얻도록 최적화합니다.
+6. **구조화된 출력**: Pydantic 모델을 사용하여 JSON 스키마를 정의하고, `response_schema` 파라미터로 구조화된 JSON 출력을 생성합니다.
+7. 프롬프트는 포트폴리오 분석 전문가 역할로 설계하여 **구조화된 JSON 형식**으로 다음을 생성하도록 합니다:
+   - **4개 탭으로 구성된 구조화된 JSON 출력**:
+     - 총괄 요약 탭: 종합 스코어, 핵심 기준 스코어, 강점/약점
+     - 포트폴리오 심층 분석 탭: 상세 분석, 기회 및 개선 방안
+     - 개별 종목 스코어 탭: 모든 종목의 5가지 평가 기준별 점수 테이블
+     - 핵심 종목 상세 분석 탭: 주요 종목의 카테고리별 상세 분석
+8. API 호출 시 구조화된 JSON 응답을 얻도록 최적화하며, 하위 호환성을 위해 마크다운 텍스트 응답도 지원합니다.
 
 ### API 설계
 1. 이미지 업로드: `POST /api/analyze` (단일/다중 이미지 통합)
 2. 요청 형식: `multipart/form-data`
-3. 요청 Body: `files` (이미지 파일 배열, 1-5개)
-4. 응답 형식: JSON (마크다운 텍스트 포함)
+3. 요청 Body: `files` (이미지 파일 배열, 1-5개), `format` (선택사항: "json" 또는 "markdown")
+4. 응답 형식: 
+   - 구조화된 JSON (기본값, 4개 탭 데이터 포함)
+   - 마크다운 텍스트 (하위 호환성, format=markdown 시)
 
 ### 데이터 형식
+**구조화된 JSON 출력 (기본값):**
 ```json
 {
-  "content": "**AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]\n\n**포트폴리오 종합 리니아 스코어: [0-100] / 100**\n\n**3대 핵심 기준 스코어:**\n\n- **성장 잠재력:** [0-100] / 100\n- **안정성 및 방어력:** [0-100] / 100\n- **전략적 일관성:** [0-100] / 100\n\n... (expected_result.md와 동일한 마크다운 형식의 전체 분석 결과)",
+  "portfolioReport": {
+    "version": "1.0",
+    "reportDate": "2025-09-30",
+    "tabs": [
+      {
+        "tabId": "dashboard",
+        "tabTitle": "총괄 요약",
+        "content": {
+          "overallScore": {
+            "title": "포트폴리오 종합 스코어",
+            "score": 72,
+            "maxScore": 100
+          },
+          "coreCriteriaScores": [...],
+          "strengths": [...],
+          "weaknesses": [...]
+        }
+      }
+      // ... 4개 탭의 전체 구조화된 데이터
+    ]
+  },
+  "processing_time": 15.2,
+  "request_id": "uuid-string",
+  "images_processed": 3
+}
+```
+
+**마크다운 출력 (하위 호환성):**
+```json
+{
+  "content": "**AI 총평:** [포트폴리오 전략과 주요 리스크를 2-3문장으로 요약]\n\n**포트폴리오 종합 스코어: [0-100] / 100**\n\n... (expected_result.md와 동일한 마크다운 형식)",
   "processing_time": 15.2,
   "request_id": "uuid-string",
   "images_processed": 3
@@ -103,20 +141,25 @@
 
 ### 에러 처리
 - 400: 잘못된 요청 (이미지 파일이 아님, 파일 개수가 1-5개 범위를 벗어남)
-- 500: 내부 서버 오류 (Gemini 응답 형식 오류)
+- 500: 내부 서버 오류 (Gemini 응답 형식 오류, 구조화된 출력 파싱 실패)
 - 503: 서비스 불가 (Gemini API 호출 실패)
+- **Graceful degradation**: 구조화된 출력 실패 시 마크다운 출력으로 fallback
 
 ## 개발 우선순위
 1. 이미지 업로드 기능 (단일/다중 지원)
-2. Gemini Vision API 연동
+2. Gemini Vision API 연동 및 구조화된 출력 구현
 3. Google Search 기능 통합
-4. 마크다운 텍스트 렌더링
-5. 에러 처리 및 사용자 피드백
+4. 탭 기반 UI 구현 (TabbedAnalysisDisplay)
+5. 구조화된 출력 최적화 및 테스트
+6. 하위 호환성 보장 (마크다운 출력)
 
 ## 테스트
 - 프론트엔드: Jest + React Testing Library
 - 백엔드: pytest
-- API 테스트: 실제 이미지 파일로 마크다운 출력 품질 테스트 (단일/다중 이미지)
+- API 테스트: 
+  - 구조화된 JSON 출력 품질 테스트 (단일/다중 이미지)
+  - 마크다운 출력 품질 테스트 (하위 호환성)
+  - 탭 기반 UI 렌더링 테스트
 
 ## 보안 고려사항
 1. 업로드된 이미지는 처리 후 즉시 삭제
