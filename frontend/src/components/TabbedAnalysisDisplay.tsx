@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { StructuredAnalysisResponse } from '@/types/portfolio';
+import { StructuredAnalysisResponse, TabContent, isDashboardContent, isDeepDiveContent, isAllStockScoresContent, isKeyStockAnalysisContent } from '@/types/portfolio';
 import { BarChart3, TrendingUp, Table, FileText } from 'lucide-react';
 import DashboardTab from './tabs/DashboardTab';
 import AllStockScoresTab from './tabs/AllStockScoresTab';
+import DeepDiveTab from './tabs/DeepDiveTab';
+import KeyStockAnalysisTab from './tabs/KeyStockAnalysisTab';
 
 interface TabbedAnalysisDisplayProps {
   data: StructuredAnalysisResponse;
@@ -26,20 +28,31 @@ export default function TabbedAnalysisDisplay({ data }: TabbedAnalysisDisplayPro
   const renderTabContent = () => {
     if (!activeTab) return null;
     
+    const content = activeTab.content as unknown as TabContent;
     switch (activeTab.tabId) {
       case 'dashboard':
-        return <DashboardTab content={activeTab.content as any} />;
+        if (isDashboardContent(content)) return <DashboardTab content={content} />;
+        break;
+      case 'deepDive':
+        if (isDeepDiveContent(content)) return <DeepDiveTab content={content} />;
+        break;
       case 'allStockScores':
-        return <AllStockScoresTab content={activeTab.content as any} />;
+        if (isAllStockScoresContent(content)) return <AllStockScoresTab content={content} />;
+        break;
+      case 'keyStockAnalysis':
+        if (isKeyStockAnalysisContent(content)) return <KeyStockAnalysisTab content={content} />;
+        break;
       default:
-        return (
-          <div className="bg-gray-50 rounded-lg p-6">
-            <pre className="text-sm overflow-auto">
-              {JSON.stringify(activeTab.content, null, 2)}
-            </pre>
-          </div>
-        );
+        break;
     }
+    // 타입 미스매치나 알 수 없는 컨텐츠는 JSON으로 안전 출력
+    return (
+      <div className="bg-gray-50 rounded-lg p-6">
+        <pre className="text-sm overflow-auto">
+          {JSON.stringify(activeTab.content, null, 2)}
+        </pre>
+      </div>
+    );
   };
   
   return (

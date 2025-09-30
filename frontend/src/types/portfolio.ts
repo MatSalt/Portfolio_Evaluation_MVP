@@ -177,3 +177,30 @@ export function isStructuredResponse(
 ): response is StructuredAnalysisResponse {
   return (response as StructuredAnalysisResponse).portfolioReport !== undefined;
 }
+
+// ============================================
+// TabContent 서브타입 가드 (UI 렌더링 안전성 강화)
+// ============================================
+export function isDashboardContent(content: TabContent): content is DashboardContent {
+  return (
+    typeof (content as any)?.overallScore === 'object' &&
+    Array.isArray((content as any)?.coreCriteriaScores) &&
+    Array.isArray((content as any)?.strengths) &&
+    Array.isArray((content as any)?.weaknesses)
+  );
+}
+
+export function isDeepDiveContent(content: TabContent): content is DeepDiveContent {
+  return (
+    Array.isArray((content as any)?.inDepthAnalysis) &&
+    typeof (content as any)?.opportunities === 'object'
+  );
+}
+
+export function isAllStockScoresContent(content: TabContent): content is AllStockScoresContent {
+  return typeof (content as any)?.scoreTable === 'object';
+}
+
+export function isKeyStockAnalysisContent(content: TabContent): content is KeyStockAnalysisContent {
+  return Array.isArray((content as any)?.analysisCards);
+}
