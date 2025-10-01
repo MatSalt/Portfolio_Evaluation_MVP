@@ -13,7 +13,7 @@ import {
   Clock,
   Image as ImageIcon
 } from 'lucide-react';
-import { AnalysisState } from '@/types/portfolio';
+import { AnalysisState, isStructuredResponse } from '@/types/portfolio';
 
 interface AnalysisDisplayProps {
   analysisState: AnalysisState;
@@ -108,6 +108,11 @@ export default function AnalysisDisplay({
 
   // 분석 완료 상태 UI
   if (analysisState.status === 'success' && analysisState.data) {
+    // 구조화된 응답인 경우 이 컴포넌트에서는 처리하지 않음
+    if (isStructuredResponse(analysisState.data)) {
+      return null;
+    }
+    
     const { content, processing_time, images_processed } = analysisState.data;
     
     return (
