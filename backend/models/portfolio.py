@@ -164,10 +164,24 @@ class DeepDiveContent(BaseModel):
     opportunities: Opportunities = Field(..., description="기회 및 개선 방안")
 
 
+class StockScoreRow(BaseModel):
+    """종목 스코어 행"""
+    주식: str = Field(..., description="종목명")
+    Overall: int = Field(..., ge=0, le=100, description="종합 점수")
+    펀더멘탈: int = Field(..., ge=0, le=100, description="펀더멘탈 점수")
+    기술_잠재력: int = Field(..., ge=0, le=100, alias="기술 잠재력", description="기술 잠재력 점수")
+    거시경제: int = Field(..., ge=0, le=100, description="거시경제 점수")
+    시장심리: int = Field(..., ge=0, le=100, description="시장심리 점수")
+    CEO_리더십: int = Field(..., ge=0, le=100, alias="CEO/리더십", description="CEO/리더십 점수")
+
+    class Config:
+        populate_by_name = True  # alias와 field name 모두 허용
+
+
 class ScoreTable(BaseModel):
     """점수 테이블"""
     headers: List[str] = Field(..., description="테이블 헤더")
-    rows: List[Dict[str, Union[str, int]]] = Field(
+    rows: List[StockScoreRow] = Field(
         ..., description="테이블 행 데이터"
     )
 
@@ -216,13 +230,12 @@ class Tab(BaseModel):
         ..., description="탭 ID: dashboard, deepDive, allStockScores, keyStockAnalysis"
     )
     tabTitle: str = Field(..., description="탭 제목")
-    # dict를 임시로 허용하고, model_validator에서 올바른 서브모델로 변환
+    # Union 타입만 사용 (dict 제거 - response_schema 호환성)
     content: Union[
         DashboardContent,
         DeepDiveContent,
         AllStockScoresContent,
         KeyStockAnalysisContent,
-        dict,
     ] = Field(..., description="탭 컨텐츠")
 
     @model_validator(mode="before")

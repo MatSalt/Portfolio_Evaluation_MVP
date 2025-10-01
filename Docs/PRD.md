@@ -76,14 +76,15 @@
               * **Content-Type:** `multipart/form-data`
               * **Body:** `files` (이미지 파일 배열, 1-5개)
               * **Query Parameter:** `format` (선택사항: `markdown` 또는 `json`, 기본값: `json`)
-          * **처리 로직 (Processing Logic):**
+      * **처리 로직 (Processing Logic):**
             1.  요청으로부터 이미지 파일 배열(`List[UploadFile]`)을 받는다.
             2.  이미지 파일들을 메모리에서 읽어 **Base64**로 인코딩한다.
-            3.  Google Gen AI Python SDK를 사용하여 Gemini 2.5 Flash 모델에 보낼 **프롬프트(Prompt)**와 인코딩된 이미지들을 포함하여 요청을 구성한다.
-            4.  **구조화된 출력 설정**: `response_mime_type="application/json"` 및 `response_schema`를 사용하여 JSON 형식으로 응답을 받는다.
-            5.  LLM API를 호출하고 응답을 기다린다. (비동기 처리 `async/await`)
-            6.  LLM이 반환한 **구조화된 JSON 응답**을 검증하고 파싱한다.
-            7.  성공 시, 상태 코드 `200 OK`와 함께 **구조화된 JSON 데이터**를 반환한다.
+            3.  Google Gen AI Python SDK를 사용해 2‑스텝 파이프라인으로 호출한다.
+               - 3.1 [스텝1: 검색·그라운딩] Google Search Tool 활성화, 마크다운/플레인텍스트로 최신 정보와 사실(facts), 출처(sources), 표(table rows)를 추출한다. `response_mime_type` 미지정.
+               - 3.2 [스텝2: 구조화 JSON] 스텝1 산출물(facts/sources/rows)을 컨텍스트로 주고 툴 없이 `response_mime_type="application/json"`으로 순수 JSON을 생성한다. 필요 시 `<JSON_START>/<JSON_END>` 태그 지시와 서버측 안전 추출로 노이즈 제거.
+            4.  서버에서 **Pydantic**으로 JSON을 검증한다(범위·필수 필드·스키마 일치).
+            5.  실패 시 1회 자동 보정 재시도(누락 필드·범위 오류만 수정 유도). 최종 실패면 사용자 친화적 400 응답.
+            6.  성공 시, 상태 코드 `200 OK`와 함께 **구조화된 JSON 데이터**를 반환한다.
           * **에러 핸들링 (Error Handling):**
               * 이미지 파일이 아닐 경우: `400 Bad Request`
               * 파일 개수가 1-5개 범위를 벗어날 경우: `400 Bad Request`
@@ -97,7 +98,22 @@
 
 백엔드가 Google Gen AI Python SDK를 사용하여 Gemini 모델을 호출할 때 사용할 구조화된 출력 설정입니다. [공식 문서](https://ai.google.dev/gemini-api/docs/structured-output?hl=ko#generating-json)를 참고하여 Pydantic 모델을 사용한 스키마 정의를 적용합니다.
 
-**Google Gen AI Python SDK 구조화된 출력 사용법:**
+**Two-step 생성 전략(권장):**
+
+1) 스텝1: 검색·그라운딩 호출 (Tool 사용)
+- 목적: 최신 정보/사실 수집, 표준화된 facts/sources/rows 생성
+- 설정: Google Search Tool 활성화, `response_mime_type` 미지정(텍스트 응답)
+- 출력 예: `{ facts: [...], sources: [...], rows: [...] }` 텍스트(또는 마크다운)
+
+2) 스텝2: 구조화 JSON 생성 (Tool 미사용)
+- 목적: Pydantic 스키마에 100% 일치하는 순수 JSON 생성
+- 설정: `response_mime_type: application/json`, Tool 비활성화
+- 프롬프트: 스키마 필드별 채우기, 0–100 정수 범위 강제, 한국어, 추가 텍스트 금지, 필요 시 `<JSON_START>/<JSON_END>` 태그 지시
+- 서버는 태그·코드블록 제거/브레이스 매칭으로 JSON만 추출 후 Pydantic 검증
+
+이 방식은 Tool과 `application/json` 동시 사용 제한을 우회하면서 최신성(검색)과 스키마 정확성(JSON)을 모두 만족합니다.
+
+**Google Gen AI Python SDK 구조화된 출력 사용법(예시):**
 ```python
 from google import genai
 from pydantic import BaseModel
