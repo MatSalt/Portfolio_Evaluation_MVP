@@ -475,7 +475,38 @@ export default function HomePage() {
 
 ---
 
-## 🧪 Phase 7: 테스트 및 검증 (2일)
+## 🔄 Phase 7: 백엔드 Two-step 생성 전략 전환 (1-2일)
+
+### 목표
+PRD.md의 2‑스텝 전략(검색·그라운딩 → 구조화 JSON)을 백엔드 파이프라인에 반영하여 최신 정보 반영과 스키마 정확성을 동시에 확보.
+
+### 작업 항목
+- [ ] GeminiService 분리 구현
+  - [ ] `generate_grounded_facts(image_data_list)` (스텝1)
+    - Google Search Tool 활성화, `response_mime_type` 미지정(텍스트)
+    - facts/sources/rows 형태의 구조화 텍스트 수집
+  - [ ] `generate_structured_json(facts_bundle)` (스텝2)
+    - Tool 없이 `response_mime_type=application/json`
+    - `<JSON_START>/<JSON_END>` 태그 지시 + 서버측 안전 추출
+    - Pydantic 검증 + 1회 보정 재시도
+- [ ] `analyze_portfolio_structured` 내부 플로우 리팩터링
+  - [ ] 스텝1 결과 캐시(이미지 해시 기반)
+  - [ ] 스텝2만 재시도 가능하게 분리
+  - [ ] 실패 시 사용자 친화적 400 응답
+- [ ] 로깅 강화
+  - [ ] 스텝1 요약 프리뷰 300자 로깅
+  - [ ] 검증 실패 시 필드/이유만 로깅
+- [ ] 테스트 추가
+  - [ ] 스텝1/스텝2 단위 테스트 (성공/실패)
+  - [ ] 스키마 검증/보정 재시도 E2E 테스트
+
+### 산출물
+- 검색·그라운딩 + 구조화 JSON 2‑스텝 파이프라인 코드
+- 캐싱/검증/보정 재시도/로깅 포함한 안정화된 백엔드
+
+---
+
+## 🧪 Phase 8: 테스트 및 검증 (2일)
 
 ### 7.1 백엔드 테스트
 - [ ] **단위 테스트** (pytest):
@@ -522,7 +553,7 @@ export default function HomePage() {
 
 ---
 
-## 🚀 Phase 8: 배포 및 운영 설정 (1-2일)
+## 🚀 Phase 9: 배포 및 운영 설정 (1-2일)
 
 ### 8.1 배포 환경 구성
 #### **프론트엔드 (Vercel)**
@@ -555,7 +586,7 @@ export default function HomePage() {
 
 ---
 
-## 📊 Phase 9: 최종 검증 및 문서화 (1일)
+## 📊 Phase 10: 최종 검증 및 문서화 (1일)
 
 ### 9.1 최종 테스트
 - [ ] **다양한 포트폴리오 이미지 테스트**:
@@ -616,9 +647,10 @@ export default function HomePage() {
 | 4 | Google Search 기능 통합 | 2-3일 | Google Search API 통합, 캐싱 시스템 |
 | 5 | 다중 이미지 업로드 기능 | 2-3일 | 다중 이미지 분석, UI 개선 |
 | 6 | 탭 기반 UI 통합 및 구조화된 출력 구현 | 3-4일 | 4개 탭 UI, 구조화된 JSON 출력 |
-| 7 | 테스트 및 검증 | 2일 | 테스트 코드, 성능 검증 |
-| 8 | 배포 및 운영 | 1-2일 | 프로덕션 환경 |
-| 9 | 최종 검증 | 1일 | 완성된 MVP |
+| 7 | 백엔드 Two-step 전환 | 1-2일 | 2‑스텝 파이프라인, 검증/보정 |
+| 8 | 테스트 및 검증 | 2일 | 테스트 코드, 성능 검증 |
+| 9 | 배포 및 운영 | 1-2일 | 프로덕션 환경 |
+| 10 | 최종 검증 | 1일 | 완성된 MVP |
 
 **총 예상 소요 시간: 18-25일**
 
