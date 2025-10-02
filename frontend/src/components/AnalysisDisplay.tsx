@@ -40,7 +40,7 @@ export default function AnalysisDisplay({
             <div className="space-y-3 text-sm text-gray-600">
               <p className="flex items-center justify-center">
                 <Clock className="h-4 w-4 mr-2" />
-                다중 이미지 포함 최대 5분 소요됩니다
+                다중 이미지 포함 최대 10분 소요됩니다
               </p>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="font-medium mb-2">AI 분석 진행 중...</p>

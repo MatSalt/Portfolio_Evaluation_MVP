@@ -37,7 +37,7 @@ class GeminiService:
         
         # 설정값
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "180"))  # 다중 이미지 처리를 위한 타임아웃 증가 (3분)
+        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "600"))  # Two-step 전략 통합 타임아웃 (10분)
         self.max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
         
         # 캐시 딕셔너리 (실제 환경에서는 Redis 등 사용)
@@ -281,7 +281,7 @@ class GeminiService:
             except asyncio.TimeoutError:
                 logger.warning(f"Gemini API 타임아웃 (시도 {attempt + 1})")
                 if attempt == self.max_retries - 1:
-                    raise TimeoutError(f"{self.timeout}초 내에 Gemini API 응답 없음")
+                    raise TimeoutError(f"API 호출 타임아웃: {self.timeout}초 초과")
                 await asyncio.sleep(2 ** attempt)  # 지수적 백오프
                 
             except Exception as e:
@@ -350,7 +350,7 @@ class GeminiService:
                 except asyncio.TimeoutError:
                     logger.error(f"Gemini API 다중 이미지 호출 타임아웃 (시도 {attempt + 1})")
                     if attempt == self.max_retries - 1:
-                        raise TimeoutError(f"{self.timeout}초 내에 Gemini API 응답 없음 (다중 이미지)")
+                        raise TimeoutError(f"API 호출 타임아웃: {self.timeout}초 초과")
                     await asyncio.sleep(2 ** attempt)
                     continue
                 
@@ -509,7 +509,7 @@ class GeminiService:
                 result = await self._call_gemini_api_multiple(image_data_list)
             except TimeoutError as e:
                 logger.error(f"다중 이미지 분석 타임아웃: {str(e)}")
-                raise TimeoutError(f"다중 이미지 분석 시간이 초과되었습니다. 이미지 수를 줄이거나 잠시 후 다시 시도해 주세요.")
+                raise TimeoutError(f"분석 시간이 초과되었습니다. 복잡한 포트폴리오의 경우 최대 10분까지 소요될 수 있습니다. 다시 시도해 주세요.")
             except ValueError as e:
                 logger.error(f"다중 이미지 분석 값 오류: {str(e)}")
                 raise

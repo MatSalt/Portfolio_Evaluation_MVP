@@ -5,7 +5,7 @@ import { AnalysisResponse, StructuredAnalysisResponse, ApiError, AnalysisResult 
  * API 기본 설정
  */
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_TIMEOUT = 120000; // 120초 (Google Search 포함)
+const API_TIMEOUT = 600000; // 600초 (Two-step 전략 통합 타임아웃)
 
 /**
  * 커스텀 fetch 에러 클래스
@@ -49,7 +49,7 @@ export async function analyzePortfolio(
   try {
     // AbortController for timeout (다중 파일용 타임아웃 증가)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5분으로 증가
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10분으로 증가
 
     const response = await fetch(`${API_BASE_URL}/api/analyze?format=${format}`, {
       method: 'POST',
