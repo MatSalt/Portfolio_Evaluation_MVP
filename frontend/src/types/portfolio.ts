@@ -46,7 +46,7 @@ export interface UploadState {
  */
 export interface AnalysisState {
   status: UploadStatus;
-  data: AnalysisResponse | null;
+  data: AnalysisResult | null;
   error: string | null;
 }
 

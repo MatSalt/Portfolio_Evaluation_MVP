@@ -38,8 +38,8 @@ router = APIRouter()
     description="업로드된 포트폴리오 스크린샷을 분석하여 마크다운 또는 4개 탭 구조의 JSON을 반환합니다. 기본값은 마크다운입니다."
 )
 async def analyze_portfolio(
-    files: Optional[List[UploadFile]] = File(
-        default=None,
+    files: List[UploadFile] = File(
+        default=[],
         description="포트폴리오 스크린샷 파일들 (1-5개), 필드명: files"
     ),
     file: Optional[UploadFile] = File(
