@@ -59,6 +59,12 @@ class GeminiService:
         
         return f"multiple_{len(image_data_list)}_{combined_hash.hexdigest()}"
 
+    def _generate_step2_cache_key(self, grounded_facts: str) -> str:
+        """Step 2용 캐시 키 생성 (grounded_facts 해시 기반)"""
+        # grounded_facts의 해시 생성
+        facts_hash = hashlib.md5(grounded_facts.encode('utf-8')).hexdigest()
+        return f"step2_json_{facts_hash}"
+
     def _get_portfolio_analysis_prompt(self) -> str:
         """포트폴리오 분석용 마크다운 프롬프트 생성"""
         return """
@@ -825,7 +831,7 @@ class GeminiService:
 
     async def _generate_structured_json(self, grounded_facts: str) -> PortfolioReport:
         """
-        Step 2: 구조화된 JSON 생성 (response_schema 사용 - 공식 권장 방식)
+        Step 2: 구조화된 JSON 생성 (캐싱 추가)
         
         Args:
             grounded_facts: Step 1에서 생성된 구조화된 마크다운 텍스트
@@ -836,6 +842,14 @@ class GeminiService:
         Raises:
             ValueError: JSON 생성 또는 검증 실패
         """
+        # 🆕 캐시 확인
+        cache_key = self._generate_step2_cache_key(grounded_facts)
+        if cache_key in self._cache:
+            logger.info("Step 2 캐시된 결과 반환")
+            cached_json = self._cache[cache_key]
+            # 캐시된 JSON을 PortfolioReport로 변환
+            return PortfolioReport.model_validate_json(cached_json)
+        
         for attempt in range(self.max_retries):
             try:
                 logger.info(
@@ -869,6 +883,12 @@ class GeminiService:
                     try:
                         portfolio_report = PortfolioReport.model_validate_json(response_text)
                         logger.info("Step 2: 수동 Pydantic 검증 성공")
+                        
+                        # 🆕 성공 시 캐시 저장 (JSON 문자열로 저장)
+                        portfolio_json = portfolio_report.model_dump_json()
+                        self._cache[cache_key] = portfolio_json
+                        logger.info(f"Step 2: 캐시 저장 완료 (키: {cache_key[:16]}...)")
+                        
                         return portfolio_report
                     except Exception as validation_error:
                         logger.error(f"Step 2: Pydantic 검증 실패 - {str(validation_error)}")
