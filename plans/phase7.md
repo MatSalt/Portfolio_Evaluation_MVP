@@ -752,6 +752,7 @@ tabs -> 0 -> content -> overallScore -> score
 - 현재 `GEMINI_TIMEOUT=180` (3분)으로 설정
 - Two-step 전략: Step 1 (60-150초) + Step 2 (60-120초) = **최대 270초 필요**
 - 재시도 포함 시 최대 5분 이상 소요 가능
+- 복잡한 다중 이미지 분석 시 10분까지 소요될 수 있음
 
 **해결 방안**:
 
@@ -763,18 +764,14 @@ class GeminiService:
         # 기존
         self.timeout = int(os.getenv("GEMINI_TIMEOUT", "180"))
         
-        # 개선: Two-step 전략에 맞춰 타임아웃 증가
-        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "360"))  # 6분
-        self.step1_timeout = int(os.getenv("STEP1_TIMEOUT", "180"))  # Step 1: 3분
-        self.step2_timeout = int(os.getenv("STEP2_TIMEOUT", "180"))  # Step 2: 3분
+        # 개선: Two-step 전략에 맞춰 타임아웃 대폭 증가 (통합 관리)
+        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "600"))  # 10분으로 통합
 ```
 
 **환경변수 업데이트** (`.env`):
 ```bash
-# Gemini API 타임아웃 설정
-GEMINI_TIMEOUT=360  # 전체 타임아웃: 6분
-STEP1_TIMEOUT=180   # Step 1 (검색·그라운딩): 3분
-STEP2_TIMEOUT=180   # Step 2 (JSON 생성): 3분
+# Gemini API 타임아웃 설정 (통합 관리)
+GEMINI_TIMEOUT=600  # 전체 타임아웃: 10분 (Two-step 통합)
 ```
 
 **API 호출 시 타임아웃 적용**:
@@ -782,7 +779,7 @@ STEP2_TIMEOUT=180   # Step 2 (JSON 생성): 3분
 async def _generate_grounded_facts(self, image_data_list: List[bytes]) -> str:
     # ... 기존 코드 ...
     
-    # 타임아웃 설정 추가
+    # 통합 타임아웃 설정 적용
     import asyncio
     
     try:
@@ -792,11 +789,55 @@ async def _generate_grounded_facts(self, image_data_list: List[bytes]) -> str:
                 contents=contents,
                 config=config
             ),
-            timeout=self.step1_timeout
+            timeout=self.timeout  # 10분 통합 타임아웃
         )
     except asyncio.TimeoutError:
-        raise ValueError(f"Step 1 타임아웃: {self.step1_timeout}초 초과")
+        raise ValueError(f"API 호출 타임아웃: {self.timeout}초 초과")
 ```
+
+**프론트엔드 타임아웃 설정 업데이트**:
+
+```javascript
+// frontend/src/utils/api.ts
+const API_TIMEOUT = 600000; // 10분으로 증가 (기존 5분)
+
+// 다중 파일용 타임아웃도 동일하게 조정
+const timeoutId = setTimeout(() => controller.abort(), 600000); // 10분으로 증가
+```
+
+**UI 텍스트 업데이트 필요 사항**:
+
+1. **frontend/src/components/AnalysisDisplay.tsx** (43번째 줄):
+   ```javascript
+   // 변경 전
+   다중 이미지 포함 최대 5분 소요됩니다
+   
+   // 변경 후  
+   다중 이미지 포함 최대 10분 소요됩니다
+   ```
+
+2. **frontend/src/app/page.tsx** (288번째 줄):
+   ```javascript
+   // 변경 전
+   이미지 업로드 후 2분 이내에
+   
+   // 변경 후
+   이미지 업로드 후 10분 이내에
+   ```
+
+3. **백엔드 에러 메시지 업데이트**:
+   ```python
+   # 사용자 친화적 에러 메시지
+   raise ValueError("분석 시간이 초과되었습니다. 복잡한 포트폴리오의 경우 최대 10분까지 소요될 수 있습니다. 다시 시도해 주세요.")
+   ```
+
+**예상 성능 개선**:
+
+| 시나리오 | 기존 타임아웃 | 개선 후 타임아웃 | 개선 효과 |
+|----------|--------------|-----------------|-----------|
+| **단순 포트폴리오** | 3분 (180초) | 10분 (600초) | 타임아웃 에러 해결 |
+| **복잡한 다중 이미지** | 5분 후 타임아웃 | 10분까지 허용 | 완전한 분석 가능 |
+| **재시도 포함** | 3회 재시도 시 실패 | 안정적 완료 | 성공률 대폭 향상 |
 
 ---
 

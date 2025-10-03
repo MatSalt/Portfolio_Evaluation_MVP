@@ -37,7 +37,7 @@ class GeminiService:
         
         # 설정값
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "180"))  # 다중 이미지 처리를 위한 타임아웃 증가 (3분)
+        self.timeout = int(os.getenv("GEMINI_TIMEOUT", "600"))  # Two-step 전략 통합 타임아웃 (10분)
         self.max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
         
         # 캐시 딕셔너리 (실제 환경에서는 Redis 등 사용)
@@ -58,6 +58,12 @@ class GeminiService:
             combined_hash.update(image_hash.encode())
         
         return f"multiple_{len(image_data_list)}_{combined_hash.hexdigest()}"
+
+    def _generate_step2_cache_key(self, grounded_facts: str) -> str:
+        """Step 2용 캐시 키 생성 (grounded_facts 해시 기반)"""
+        # grounded_facts의 해시 생성
+        facts_hash = hashlib.md5(grounded_facts.encode('utf-8')).hexdigest()
+        return f"step2_json_{facts_hash}"
 
     def _get_portfolio_analysis_prompt(self) -> str:
         """포트폴리오 분석용 마크다운 프롬프트 생성"""
@@ -251,7 +257,7 @@ class GeminiService:
                     temperature=0.3,  # 일관된 분석을 위해 낮은 온도
                     top_p=0.9,
                     top_k=40,
-                    max_output_tokens=8192,  # 긴 마크다운 텍스트를 위해 증가
+                    max_output_tokens=32768,  # 16384 → 32768로 증가 (최대 제한)
                     response_mime_type="text/plain"  # 플레인 텍스트 (마크다운)
                 )
                 
@@ -281,7 +287,7 @@ class GeminiService:
             except asyncio.TimeoutError:
                 logger.warning(f"Gemini API 타임아웃 (시도 {attempt + 1})")
                 if attempt == self.max_retries - 1:
-                    raise TimeoutError(f"{self.timeout}초 내에 Gemini API 응답 없음")
+                    raise TimeoutError(f"API 호출 타임아웃: {self.timeout}초 초과")
                 await asyncio.sleep(2 ** attempt)  # 지수적 백오프
                 
             except Exception as e:
@@ -336,7 +342,7 @@ class GeminiService:
                 # 4. 모델 설정
                 config = GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,  # 16384 → 32768로 증가 (최대 제한)
                     tools=[grounding_tool]
                 )
                 
@@ -350,7 +356,7 @@ class GeminiService:
                 except asyncio.TimeoutError:
                     logger.error(f"Gemini API 다중 이미지 호출 타임아웃 (시도 {attempt + 1})")
                     if attempt == self.max_retries - 1:
-                        raise TimeoutError(f"{self.timeout}초 내에 Gemini API 응답 없음 (다중 이미지)")
+                        raise TimeoutError(f"API 호출 타임아웃: {self.timeout}초 초과")
                     await asyncio.sleep(2 ** attempt)
                     continue
                 
@@ -509,7 +515,7 @@ class GeminiService:
                 result = await self._call_gemini_api_multiple(image_data_list)
             except TimeoutError as e:
                 logger.error(f"다중 이미지 분석 타임아웃: {str(e)}")
-                raise TimeoutError(f"다중 이미지 분석 시간이 초과되었습니다. 이미지 수를 줄이거나 잠시 후 다시 시도해 주세요.")
+                raise TimeoutError(f"분석 시간이 초과되었습니다. 복잡한 포트폴리오의 경우 최대 10분까지 소요될 수 있습니다. 다시 시도해 주세요.")
             except ValueError as e:
                 logger.error(f"다중 이미지 분석 값 오류: {str(e)}")
                 raise
@@ -665,7 +671,7 @@ class GeminiService:
                 # 4) 설정: Google Search 활성화, response_mime_type 미지정
                 config = GenerateContentConfig(
                     temperature=0.1,  # 일관된 정보 수집을 위해 낮은 온도
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,  # 8192 → 16384로 증가
                     tools=[grounding_tool],
                     # response_mime_type 미지정 - 텍스트 응답
                 )
@@ -701,10 +707,6 @@ class GeminiService:
                     
                     # 캐시 저장
                     self._cache[cache_key] = result_text
-                    
-                    # 결과 미리보기 로깅 (300자)
-                    preview = result_text[:300] + "..." if len(result_text) > 300 else result_text
-                    logger.info(f"Step 1 성공 - 응답 미리보기: {preview}")
                     
                     return result_text
                 
@@ -825,7 +827,7 @@ class GeminiService:
 
     async def _generate_structured_json(self, grounded_facts: str) -> PortfolioReport:
         """
-        Step 2: 구조화된 JSON 생성 (response_schema 사용 - 공식 권장 방식)
+        Step 2: 구조화된 JSON 생성 (캐싱 추가)
         
         Args:
             grounded_facts: Step 1에서 생성된 구조화된 마크다운 텍스트
@@ -836,6 +838,14 @@ class GeminiService:
         Raises:
             ValueError: JSON 생성 또는 검증 실패
         """
+        # 🆕 캐시 확인
+        cache_key = self._generate_step2_cache_key(grounded_facts)
+        if cache_key in self._cache:
+            logger.info("Step 2 캐시된 결과 반환")
+            cached_json = self._cache[cache_key]
+            # 캐시된 JSON을 PortfolioReport로 변환
+            return PortfolioReport.model_validate_json(cached_json)
+        
         for attempt in range(self.max_retries):
             try:
                 logger.info(
@@ -848,7 +858,7 @@ class GeminiService:
                 # 2) 설정: response_mime_type만 사용 (response_schema는 복잡한 Union 타입 미지원)
                 config = GenerateContentConfig(
                     temperature=0.0,  # 결정론적 변환을 위해 온도 0
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,  # 16384 → 32768로 증가 (최대 제한)
                     response_mime_type="application/json",  # JSON 모드
                     # response_schema 미사용 - Union[..., dict] 타입이 additionalProperties 생성
                     # tools 없음 - Google Search Tool 비활성화
@@ -869,6 +879,12 @@ class GeminiService:
                     try:
                         portfolio_report = PortfolioReport.model_validate_json(response_text)
                         logger.info("Step 2: 수동 Pydantic 검증 성공")
+                        
+                        # 🆕 성공 시 캐시 저장 (JSON 문자열로 저장)
+                        portfolio_json = portfolio_report.model_dump_json()
+                        self._cache[cache_key] = portfolio_json
+                        logger.info(f"Step 2: 캐시 저장 완료 (키: {cache_key[:16]}...)")
+                        
                         return portfolio_report
                     except Exception as validation_error:
                         logger.error(f"Step 2: Pydantic 검증 실패 - {str(validation_error)}")
@@ -879,14 +895,14 @@ class GeminiService:
                             await asyncio.sleep(1)
                             continue
                         
-                        # JSON 미리보기 로깅 (디버깅용, 500자만)
-                        preview = response_text[:500] if len(response_text) > 500 else response_text
-                        logger.debug(f"Step 2: 검증 실패 JSON 미리보기: {preview}...")
+                        # JSON 끝부분 확인
+                        if len(response_text) > 100:
+                            logger.error(f"Step 2: JSON 끝부분 (마지막 100자): {response_text[-100:]}")
                         raise ValueError(
                             f"JSON이 스키마와 일치하지 않습니다: {str(validation_error)}"
                         )
-                
-                raise ValueError("Step 2: Gemini API에서 응답을 받지 못했습니다.")
+                else:
+                    raise ValueError("Step 2: Gemini API에서 응답을 받지 못했습니다.")
                 
             except Exception as e:
                 logger.error(f"Step 2 호출 실패 (시도 {attempt + 1}): {str(e)}")
@@ -1004,7 +1020,7 @@ class GeminiService:
                 # 4) 설정: 도구 사용 유지, MIME 타입 강제 지정 제거 (도구와 동시 사용 시 제약 회피)
                 config = GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,  # 16384 → 32768로 증가 (최대 제한)
                     tools=[grounding_tool],
                 )
 
