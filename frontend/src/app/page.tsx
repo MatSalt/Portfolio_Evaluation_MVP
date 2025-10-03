@@ -285,7 +285,7 @@ export default function Home() {
                   즉시 결과 확인
                 </h4>
                 <p className="text-gray-600">
-                  이미지 업로드 후 2분 이내에 
+                  이미지 업로드 후 10분 이내에 
                   최신 시장 정보 기반 상세한 분석 리포트를 받아보세요.
                 </p>
               </div>
