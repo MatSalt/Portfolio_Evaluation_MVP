@@ -257,7 +257,7 @@ class GeminiService:
                     temperature=0.3,  # 일관된 분석을 위해 낮은 온도
                     top_p=0.9,
                     top_k=40,
-                    max_output_tokens=8192,  # 긴 마크다운 텍스트를 위해 증가
+                    max_output_tokens=16384,  # 8192 → 16384로 증가
                     response_mime_type="text/plain"  # 플레인 텍스트 (마크다운)
                 )
                 
@@ -342,7 +342,7 @@ class GeminiService:
                 # 4. 모델 설정
                 config = GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=8192,
+                    max_output_tokens=16384,  # 8192 → 16384로 증가
                     tools=[grounding_tool]
                 )
                 
@@ -671,7 +671,7 @@ class GeminiService:
                 # 4) 설정: Google Search 활성화, response_mime_type 미지정
                 config = GenerateContentConfig(
                     temperature=0.1,  # 일관된 정보 수집을 위해 낮은 온도
-                    max_output_tokens=8192,
+                    max_output_tokens=16384,  # 8192 → 16384로 증가
                     tools=[grounding_tool],
                     # response_mime_type 미지정 - 텍스트 응답
                 )
@@ -708,9 +708,9 @@ class GeminiService:
                     # 캐시 저장
                     self._cache[cache_key] = result_text
                     
-                    # 결과 미리보기 로깅 (300자)
-                    preview = result_text[:300] + "..." if len(result_text) > 300 else result_text
-                    logger.info(f"Step 1 성공 - 응답 미리보기: {preview}")
+                    # 전체 결과 로깅 (디버깅용)
+                    logger.info(f"Step 1 성공 - 전체 응답 길이: {len(result_text)}자")
+                    logger.info(f"Step 1 전체 응답:\n{result_text}")
                     
                     return result_text
                 
@@ -862,7 +862,7 @@ class GeminiService:
                 # 2) 설정: response_mime_type만 사용 (response_schema는 복잡한 Union 타입 미지원)
                 config = GenerateContentConfig(
                     temperature=0.0,  # 결정론적 변환을 위해 온도 0
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,  # 16384 → 32768로 증가 (최대 제한)
                     response_mime_type="application/json",  # JSON 모드
                     # response_schema 미사용 - Union[..., dict] 타입이 additionalProperties 생성
                     # tools 없음 - Google Search Tool 비활성화
@@ -879,6 +879,8 @@ class GeminiService:
                 if response and getattr(response, "text", None):
                     logger.info("Step 2: JSON 응답 수신, 수동 파싱 시작")
                     response_text = response.text.strip()
+                    logger.info(f"Step 2 JSON 응답 길이: {len(response_text)}자")
+                    logger.info(f"Step 2 전체 JSON 응답:\n{response_text}")
                     
                     try:
                         portfolio_report = PortfolioReport.model_validate_json(response_text)
@@ -899,12 +901,28 @@ class GeminiService:
                             await asyncio.sleep(1)
                             continue
                         
-                        # JSON 미리보기 로깅 (디버깅용, 500자만)
-                        preview = response_text[:500] if len(response_text) > 500 else response_text
-                        logger.debug(f"Step 2: 검증 실패 JSON 미리보기: {preview}...")
+                        # JSON 잘림 감지 로깅 (디버깅용)
+                        logger.error(f"Step 2: 검증 실패 - JSON 전체 길이: {len(response_text)}자")
+                        logger.error(f"Step 2: 전체 JSON 응답:\n{response_text}")
+                        # JSON 끝부분 확인
+                        if len(response_text) > 100:
+                            logger.error(f"Step 2: JSON 끝부분 (마지막 100자): {response_text[-100:]}")
                         raise ValueError(
                             f"JSON이 스키마와 일치하지 않습니다: {str(validation_error)}"
                         )
+                else:
+                    # 응답 객체 상세 분석
+                    logger.error(f"Step 2: 응답 객체 분석")
+                    logger.error(f"response 존재: {response is not None}")
+                    if response:
+                        logger.error(f"response 타입: {type(response)}")
+                        logger.error(f"response 속성들: {dir(response)}")
+                        logger.error(f"response.text 존재: {hasattr(response, 'text')}")
+                        if hasattr(response, 'text'):
+                            logger.error(f"response.text 값: {response.text}")
+                        logger.error(f"response 전체: {response}")
+                    else:
+                        logger.error("response 객체가 None입니다")
                 
                 raise ValueError("Step 2: Gemini API에서 응답을 받지 못했습니다.")
                 
@@ -1024,7 +1042,7 @@ class GeminiService:
                 # 4) 설정: 도구 사용 유지, MIME 타입 강제 지정 제거 (도구와 동시 사용 시 제약 회피)
                 config = GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=8192,
+                    max_output_tokens=16384,  # 8192 → 16384로 증가
                     tools=[grounding_tool],
                 )
 
